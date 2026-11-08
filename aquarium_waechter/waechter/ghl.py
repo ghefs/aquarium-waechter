@@ -173,6 +173,40 @@ ART_SHORT = {"Temperatur": "Temperatur", "pH": "pH", "Redox": "Redox", "Leitwert
              "Leitwert (Süßwasser)": "Leitwert", "Sauerstoff": "Sauerstoff"}
 
 
+# Steckdosenleisten von GHL (Auswahl in HA): Anzeige -> (Kurzname, Dosen, misst Strom)
+NO_STRIP = "– keine –"
+STRIP_TYPES = {
+    "STDL4-4 – 4 Dosen, ohne Strommessung (S-Anschluss)": ("STDL4-4", 4, False),
+    "Powerbar 6E-PAB – 6 Dosen, mit Strommessung": ("Powerbar 6E-PAB", 6, True),
+    "Powerbar 6D-PAB – 6 Dosen, mit Strommessung": ("Powerbar 6D-PAB", 6, True),
+    "Powerbar 5.1-PAB – 5 Dosen, mit Strommessung": ("Powerbar 5.1-PAB", 5, True),
+    "Powerhub 6D-PAB – 6 Kanäle, mit Strommessung": ("Powerhub 6D-PAB", 6, True),
+    "Andere – 2 Dosen, ohne Strommessung": ("Leiste", 2, False),
+    "Andere – 4 Dosen, ohne Strommessung": ("Leiste", 4, False),
+    "Andere – 6 Dosen, mit Strommessung": ("Leiste", 6, True),
+    "Andere – 8 Dosen, ohne Strommessung": ("Leiste", 8, False),
+}
+MAX_STRIPS = 8
+
+
+def strips_from_choice(choices):
+    """Liste der Auswahlfelder (Leiste 1, 2 …) -> [(name, anzahl, misst_strom)]"""
+    out = []
+    for c in choices:
+        if c in STRIP_TYPES:
+            out.append(STRIP_TYPES[c])
+    return out
+
+
+def strips_summary(strips):
+    """'Steckdose 1–4: STDL4-4 (ohne Strommessung) · Steckdose 5–10: Powerbar 6E-PAB'"""
+    parts, start = [], 1
+    for name, count, current in strips:
+        parts.append(f"Steckdose {start}–{start + count - 1}: {name}" + ("" if current else " (ohne Strommessung)"))
+        start += count
+    return " · ".join(parts) + (f" · ab Steckdose {start}: ohne Leiste durchgezählt" if parts else "")
+
+
 def parse_strips(text):
     """'Alt=4 (ohne Strom), PAB=6' oder '4,6' -> [(name, anzahl, misst_strom), ...]
 
@@ -363,6 +397,7 @@ class Inventory:
             strip, pos, measures = socket_pos(c["i"], self.strips)
             out.append({"key": f"switch_{c['i']}", "kind": "switch", "name": c["name"],
                         "label": label(f"Steckdose {pos}", c), "strip": strip,
+                        "strip_no": int(pos.split(".")[0]) if strip else 0,
                         "named": c["named"], "unit": "A", "current": c["current"] and measures, "i": c["i"]})
         for s in self.sensors:
             art = settings.get(f"sensor_{s['i']}").get("art") or s["guess"]

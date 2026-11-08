@@ -18,6 +18,22 @@ Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencompute
 Die Alarme schickt das Add-on **direkt** an Telegram – sie kommen also auch dann,
 wenn Home Assistant selbst gerade hängt.
 
+### Warum dieses Projekt?
+
+Weil am Wochenende unbemerkt eine Pumpe ausgefallen ist. Der Aquariencomputer regelt
+zuverlässig – aber er sagt einem nicht unbedingt, **dass ein Gerät gar nicht läuft**.
+Genau diese Lücke schließt der Wächter:
+
+- **Ausgänge wirklich überwachen:** Steckdose ist AN, aber die Pumpe zieht keinen
+  Strom? → Alarm. Strom plötzlich zu hoch (blockierte Pumpe)? → Alarm.
+- **KH-Director im Blick:** Seit Stunden keine Messung mehr (Reagenz leer, Schlauch
+  verstopft)? → Alarm. Ab Firmware 7.52 zusätzlich Leck- und Messbereichsalarm.
+- **Sensorfehler:** Sonde liefert keinen gültigen Wert mehr? → Alarm (ab Firmware 7.52).
+- **Dosierbehälter:** rechtzeitig „Nachfüllen“, in ml und %.
+- **ProfiLux weg** (Stromausfall, WLAN, API nach Firmware-Update aus)? → Alarm.
+- Alles mit Verzögerung gegen Fehlalarme, Erinnerung und „Wieder OK“ – aufs Handy,
+  unabhängig von Cloud und App.
+
 > **Kein offizielles Produkt von GHL.** Unabhängiges Open-Source-Projekt, nicht mit
 > GHL Advanced Technology verbunden oder von GHL unterstützt. „GHL“, „ProfiLux“ und
 > „GHL Connect“ sind Marken ihrer jeweiligen Inhaber und werden hier nur verwendet,
@@ -184,7 +200,7 @@ Alles mit **Lesezugriff** – der Wächter schaltet nie etwas.
 
 | Bereich | Was in HA erscheint | Alarm möglich | Lücken / Hinweise |
 |---|---|---|---|
-| Steckdosen (bis 64) | an/aus, Strom in A | Strom zu niedrig (Gerät läuft nicht) / zu hoch | Schalten geht nicht (API nur lesend). Leisten ohne Strommessung melden immer 0 A → als „ohne Strom“ eintragen |
+| Steckdosen (bis 64) | an/aus, Strom in A | Strom zu niedrig (Gerät läuft nicht) / zu hoch | Schalten geht nicht (API nur lesend). Leisten ohne Strommessung (STDL4-4) melden immer 0 A → Leiste auswählen, dann kein Strom-Alarm |
 | Sensoren (bis 32) | Messwert, Sollwert; Leitwert zusätzlich Salinität und Dichte | unter Minimum / über Maximum; Sensorfehler laut ProfiLux¹ | Die Sensor-**Art** liefert die API nicht – sie wird geschätzt und ist in HA wählbar |
 | Niveausensoren (bis 16) | Zustand 0/1 | bei 0 oder bei 1 | Welcher Wert „Alarm“ bedeutet, mit dem Schwimmer ausprobieren |
 | Durchfluss (bis 4) | Durchfluss | unter/über Grenze | Einheit liefert die API nicht |
@@ -218,7 +234,7 @@ Jeder Name beginnt mit einem Kürzel, damit man immer weiß, was gemeint ist:
 | Kürzel | Bedeutung |
 |---|---|
 | `Steckdose 5 · Heizer` | Steckdose 5 (ohne Leisten-Angabe einfach durchgezählt) |
-| `Steckdose 2.3 · Heizer` | Leiste 2, Dose 3 (mit [Steckdosenleisten](#steckdosenleisten)) |
+| `Steckdose 2.3 · Heizer` | Leiste 2, Dose 3 (wenn [Steckdosenleisten](#steckdosenleisten) gewählt sind) |
 | `Temperatur · Becken`, `pH · Sonde 2`, `Salinität · Leitwert` | Sensor nach Art |
 | `Niveau 1 · …`, `Durchfluss 1 · …`, `Dosierer 4 · Kalium`, `Licht 1 · Weiß` | Art und Nummer wie in GHL Connect |
 | `KH-Director · …`, `ION-Director · …` | Messgeräte |
@@ -228,22 +244,30 @@ Die Zahlen entsprechen der Zählung in GHL Connect (ab 1).
 ### Steckdosenleisten
 
 Die GHL-API verrät nicht, welche Steckdose auf welcher Leiste sitzt – sie zählt die
-Steckdosen einfach über alle Leisten durch. Die Aufteilung trägt man deshalb einmal je
-Gerät ein, **in der Reihenfolge der Kanäle** (wie in GHL Connect unter den
-Steckdosen bzw. PAB-Geräten zu sehen): Dashboard → Einstellungsseite →
-**Steckdosenleisten → Aufteilung**, z. B.
+Steckdosen einfach über alle Leisten durch. Deshalb wählt man die Leisten einmal aus:
+Dashboard → Einstellungsseite → **Steckdosenleisten** → **Leiste 1**, **Leiste 2** …
 
-```
-Alt=4 (ohne Strom), PAB=6
-```
+| Auswahl | Dosen | Strommessung |
+|---|---|---|
+| STDL4-4 (am S-Anschluss des ProfiLux) | 4 | nein |
+| Powerbar 6E-PAB | 6 | ja |
+| Powerbar 6D-PAB | 6 | ja |
+| Powerbar 5.1-PAB | 5 | ja |
+| Powerhub 6D-PAB | 6 Kanäle | ja |
+| Andere – 2/4/8 Dosen ohne bzw. 6 Dosen mit Strommessung | | |
 
-Das heißt: Kanal 1–4 sind die Leiste „Alt“, Kanal 5–10 die Leiste „PAB“. Ergebnis:
-Namen wie `Steckdose 2.1 · Strömungspumpe`, im Dashboard je Leiste ein eigener Block.
-`(ohne Strom)` kennzeichnet Leisten **ohne Strommessung** (ältere Leisten liefern
-immer 0 A) – dort gibt es dann keinen sinnlosen Strom-Alarm, nur die Anzeige an/aus.
-Nur Zahlen gehen auch: `4,6` → „Leiste 1“, „Leiste 2“. Leer = einfach durchzählen.
-Für viele Geräte auf einmal geht es auch in der Add-on-Konfiguration als Vorgabe
-(`steckdosenleisten: "Alt=4 (ohne Strom), PAB=6"` je Gerät).
+**Leiste 1** bekommt die ersten Steckdosen, **Leiste 2** die nächsten usw. – in der
+Reihenfolge der Steckdosennummern in GHL Connect (meist zuerst die STDL-Leisten am
+S-Anschluss, dann die PAB-Leisten). Darunter zeigt das Dashboard das Ergebnis, z. B.
+
+> Steckdose 1–4: STDL4-4 (ohne Strommessung) · Steckdose 5–10: Powerbar 6E-PAB
+
+Danach heißen die Steckdosen `Steckdose 2.1 · Strömungspumpe` (Leiste 2, Dose 1), im
+Dashboard hat jede Leiste einen eigenen Block, und Leisten **ohne Strommessung**
+bekommen keinen (sinnlosen) Strom-Alarm – dort gibt es nur die Anzeige an/aus.
+
+Für viele Geräte auf einmal geht es auch als Vorgabe in der Add-on-Konfiguration
+(Text, Anzahl Dosen je Leiste): `steckdosenleisten: "STDL=4 (ohne Strom), PAB=6"`.
 
 ### Überwachung einstellen
 

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .bridge import Bridge
 from .dashboard import Dashboard
-from .ghl import GhlClient, Inventory, ReadError
+from .ghl import GhlClient, Inventory, ReadError, strips_from_choice
 from .haws import HaWs
 from .mqtt import Mqtt, MqttError
 from .notify import Notifier
@@ -42,7 +42,7 @@ class DeviceWorker(threading.Thread):
         self.ghl = GhlClient(self.host, int(dev_cfg.get("port", 10002)))
         self.settings = app.store.device(uid, first=first)
         self.inv = Inventory(self.ghl, dev_cfg, enabled=self.bereich, keep=self.kept)
-        self.inv.set_strips(self.leisten())
+        self.apply_leisten()
         app.store.unnamed_default[uid] = bool(dev_cfg.get("unbenannte_abfragen", False))
         self.items = []
         self.announced = False
@@ -70,11 +70,18 @@ class DeviceWorker(threading.Thread):
         return self.app.store.data["geraete"].get(self.uid, {}).get(key, {}).get("aktiv") is True
 
     def leisten(self):
-        """Aufteilung der Steckdosen auf Leisten – Textfeld in HA, Vorgabe aus der Konfiguration."""
-        return self.settings.leisten(self.cfg.get("steckdosenleisten") or "")
+        """Steckdosenleisten: Auswahl in HA, sonst Vorgabe (Text) aus der Add-on-Konfiguration."""
+        return self.settings.leisten() or []
+
+    def apply_leisten(self):
+        chosen = self.leisten()
+        if chosen:
+            self.inv.strips = strips_from_choice(chosen)
+        else:
+            self.inv.set_strips(self.cfg.get("steckdosenleisten") or "")
 
     def leisten_changed(self):
-        self.inv.set_strips(self.leisten())
+        self.apply_leisten()
         self._sig = None
         self.items_changed()
 

@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 
 from .bridge import Bridge
-from .ghl import CATEGORY_NAMES
+from .ghl import CATEGORY_NAMES, MAX_STRIPS, strips_summary
 from .haws import HaError
 
 log = logging.getLogger("waechter")
@@ -64,10 +64,13 @@ def _strips(switches):
     """Steckdosen nach Leiste gruppieren -> [(Titel, [items])]."""
     groups = {}
     for it in switches:
-        groups.setdefault(it.get("strip") or "", []).append(it)
+        groups.setdefault(it.get("strip_no", 0), []).append(it)
     out = []
-    for n, (strip, its) in enumerate(groups.items()):
-        title = "Steckdosen" if not strip else f"Leiste {its[0]['label'].split()[1].split('.')[0]} – {strip}"
+    for no, its in sorted(groups.items(), key=lambda g: g[0] or 999):
+        if no:
+            title = f"Leiste {no} – {its[0]['strip']}"
+        else:
+            title = "Steckdosen ohne Leiste" if len(groups) > 1 else "Steckdosen"
         out.append((title, its))
     return out
 
@@ -131,10 +134,15 @@ def build(workers):
             {"type": "markdown", "content": HELP},
             {"type": "heading", "heading": "Steckdosenleisten", "heading_style": "subtitle"},
             {"type": "markdown", "content": (
-                "Steckdosen in der Reihenfolge der Kanäle auf Leisten aufteilen, z. B. "
-                "`Alt=4 (ohne Strom), PAB=6` → Kanal 1–4 = Leiste 1, 5–10 = Leiste 2. "
-                "*(ohne Strom)* = Leiste misst keinen Strom → kein Strom-Alarm. Leer = durchzählen.")},
-            {"type": "entities", "entities": [{"entity": e("text", "steckdosenleisten"), "name": "Aufteilung"}]},
+                "Welche Leisten hängen am ProfiLux? **Leiste 1** bekommt die ersten Steckdosen, "
+                "**Leiste 2** die nächsten usw. – Reihenfolge wie die Steckdosennummern in GHL Connect "
+                "(meist zuerst die STDL-Leisten am S-Anschluss, dann die PAB-Leisten). "
+                "Leisten **ohne Strommessung** bekommen keinen Strom-Alarm.\n\n"
+                + ("**Ergebnis:** " + strips_summary(dev.inv.strips) if dev.inv.strips
+                   else "*Noch keine Leisten gewählt – Steckdosen werden einfach durchgezählt.*"))},
+            {"type": "entities", "entities": [
+                {"entity": e("select", f"leiste_{n}")}
+                for n in range(1, min(MAX_STRIPS, len(dev.leisten()) + 1) + 1)]},
             {"type": "heading", "heading": "Bereiche", "heading_style": "subtitle"},
             {"type": "entities", "state_color": True, "entities": [
                 {"entity": e("switch", f"bereich_{cat}"), "name": name}

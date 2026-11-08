@@ -12,7 +12,7 @@ aus HA entfernt (leere Discovery-Nachricht).
 import datetime
 import logging
 
-from .ghl import CATEGORIES, CATEGORY_NAMES, SENSOR_ARTS
+from .ghl import CATEGORIES, CATEGORY_NAMES, MAX_STRIPS, NO_STRIP, SENSOR_ARTS, STRIP_TYPES
 from .mqtt import MqttError
 from .settings import LEVEL_MODES, rule
 
@@ -31,7 +31,7 @@ class Bridge:
         mqtt.on_connect = self._on_connect
         mqtt.subscribe(f"{prefix}/+/cfg/+/+/set")
         mqtt.subscribe(f"{prefix}/+/bereich/+/set")
-        mqtt.subscribe(f"{prefix}/+/leisten/set")
+        mqtt.subscribe(f"{prefix}/+/leiste/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/+")
 
     # ------------------------------------------------------------ eingehend
@@ -49,11 +49,11 @@ class Bridge:
         if len(parts) == 3 and parts[1] == "_waechter" and parts[2] in self.commands:
             self.commands[parts[2]]()
             return
-        if len(parts) == 4 and parts[2] == "leisten" and parts[3] == "set":
-            dev = self.devices.get(parts[1])
-            if dev:
-                value = dev.settings.set_leisten(payload)
-                self._pub(f"{self.prefix}/{dev.uid}/leisten", value, retain=True)
+        if len(parts) == 5 and parts[2] == "leiste" and parts[4] == "set" and parts[3].isdigit():
+            dev, n = self.devices.get(parts[1]), int(parts[3])
+            if dev and 1 <= n <= MAX_STRIPS and (payload in STRIP_TYPES or payload == NO_STRIP):
+                dev.settings.set_leiste(n, payload)
+                self.publish_strips(dev)
                 dev.leisten_changed()
             return
         if len(parts) == 5 and parts[2] == "bereich" and parts[4] == "set" and parts[3] in CATEGORIES:
@@ -103,7 +103,13 @@ class Bridge:
                     self.publish_field(dev, it["key"], field, value)
         for cat in CATEGORIES:
             self._pub(f"{self.prefix}/{dev.uid}/bereich/{cat}", "ON" if dev.bereich(cat) else "OFF", retain=True)
-        self._pub(f"{self.prefix}/{dev.uid}/leisten", dev.leisten(), retain=True)
+        self.publish_strips(dev)
+
+    def publish_strips(self, dev):
+        chosen = dev.leisten()
+        for n in range(1, MAX_STRIPS + 1):
+            v = chosen[n - 1] if n <= len(chosen) else NO_STRIP
+            self._pub(f"{self.prefix}/{dev.uid}/leiste/{n}", v, retain=True)
 
     # ------------------------------------------------------------ Discovery
     def announce_waechter(self):
@@ -168,10 +174,18 @@ class Bridge:
                 "state_topic": f"{base}/bereich/{cat}", "command_topic": f"{base}/bereich/{cat}/set"},
                 f"switch.{uid}_bereich_{cat}", live=False)
 
-        ent("text", "steckdosenleisten", {
-            "name": "Steckdosenleisten", "icon": "mdi:power-socket-eu", "entity_category": "config",
-            "max": 120, "state_topic": f"{base}/leisten", "command_topic": f"{base}/leisten/set"},
-            f"text.{uid}_steckdosenleisten", live=False)
+        gone("text", "steckdosenleisten")  # gab es kurz in 4.1.0
+        # So viele Auswahlfelder wie gewählt + eins frei (höchstens MAX_STRIPS)
+        shown = min(MAX_STRIPS, len(dev.leisten()) + 1)
+        for n in range(1, MAX_STRIPS + 1):
+            if n > shown:
+                gone("select", f"leiste_{n}")
+                continue
+            ent("select", f"leiste_{n}", {
+                "name": f"Leiste {n}", "icon": "mdi:power-socket-eu", "entity_category": "config",
+                "options": [NO_STRIP] + list(STRIP_TYPES),
+                "state_topic": f"{base}/leiste/{n}", "command_topic": f"{base}/leiste/{n}/set"},
+                f"select.{uid}_leiste_{n}", live=False)
 
         ent("binary_sensor", "ghl_connected", {
             "name": "Verbindung", "device_class": "connectivity", "entity_category": "diagnostic",

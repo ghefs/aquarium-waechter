@@ -1,5 +1,5 @@
 name: Aquarium-Wächter
-version: "4.1.0"
+version: "4.1.1"
 slug: aquarium_waechter
 # Fertige Images von GitHub Actions (.github/workflows/build.yaml); ohne diese Zeile baut HA selbst
 image: ghcr.io/ghefs/{arch}-aquarium-waechter

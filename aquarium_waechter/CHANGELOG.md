@@ -3,14 +3,21 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.1.1
+
+- **Steckdosenleisten**: auf der Einstellungsseite je Leiste das GHL-Produkt wählen
+  (STDL4-4, Powerbar 6E-PAB …) → Namen `Steckdose 2.1 · …`, im Dashboard je Leiste ein
+  Block, Ergebnis im Klartext (Vorgabe auch per Option `steckdosenleisten`).
+  Leisten ohne Strommessung (STDL4-4) bekommen keinen Strom-Alarm.
+  **Bitte nach dem Update einmal die Leisten auswählen** (das Textfeld aus 4.1.0 entfällt).
+
 ## 4.1.0
 
 - **Namen mit Kürzel vorne**, damit man immer weiß, was gemeint ist:
   `Steckdose 5 · Heizer`, `pH · Becken`, `Dosierer 4 · Kalium`, `Licht 1 · Weiß` …
   (Entitäts-IDs, Verlauf und Einstellungen bleiben gleich).
-- **Steckdosenleisten**: Aufteilung auf der Einstellungsseite eintragen, z. B.
-  `Alt=4 (ohne Strom), PAB=6` → Namen `Steckdose 2.1 · …`, im Dashboard je Leiste
-  ein Block (Vorgabe auch per Option `steckdosenleisten`). Leisten „ohne Strom“ bekommen keinen (sinnlosen) Strom-Alarm mehr.
+- **Steckdosenleisten**: Aufteilung auf der Einstellungsseite eintragen →
+  Namen `Steckdose 2.1 · …`, im Dashboard je Leiste ein Block. Leisten „ohne Strom“ bekommen keinen (sinnlosen) Strom-Alarm mehr.
 - **Klarer Wortlaut** der Einstellungen („Alarm, wenn AN und Strom unter“, „Alarm erst
   nach (Dauer)“ …) und je Teil der Satz **„So wird überwacht“** im Dashboard;
   Übersicht „So wird überwacht“ mit allen überwachten Punkten. Zahlen mit Komma.

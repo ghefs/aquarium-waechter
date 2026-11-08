@@ -4,7 +4,7 @@ configuration:
     description: >-
       Pro ProfiLux: name und host (IP). Alles Weitere bequemer in HA auf der
       Einstellungsseite des Dashboards. Optional als Vorgabe: steckdosenleisten
-      (z. B. „Alt=4 (ohne Strom), PAB=6“).
+      (Dosen je Leiste, z. B. „STDL=4 (ohne Strom), PAB=6“ – einfacher: in HA die Leisten auswählen).
       Bereiche (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, licht)
       lassen sich bequemer in HA auf der Einstellungsseite an-/ausschalten.
       unbenannte_abfragen: auch Teile ohne Namen auslesen.

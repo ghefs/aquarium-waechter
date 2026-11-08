@@ -8,7 +8,7 @@ import threading
 import time
 from pathlib import Path
 
-from .ghl import SENSOR_ARTS
+from .ghl import NO_STRIP, SENSOR_ARTS
 
 log = logging.getLogger("waechter")
 
@@ -59,16 +59,24 @@ class DeviceSettings:
         v = self.store.data["geraete"].get(self.dev_id, {}).get("_bereiche", {}).get(cat)
         return default if v is None else v
 
-    def leisten(self, default=""):
+    def leisten(self):
+        """Auswahl je Leiste (Liste von Produktnamen) oder None = noch nichts gewählt."""
         v = self.store.data["geraete"].get(self.dev_id, {}).get("_leisten")
-        return default if v is None else v
+        return v if isinstance(v, list) else None
 
-    def set_leisten(self, raw):
+    def set_leiste(self, n, choice):
+        """Leiste n (1-basiert) auf ein Produkt setzen; danach leere Einträge am Ende weg."""
         with self.store.lock:
-            self.store.data["geraete"].setdefault(self.dev_id, {})["_leisten"] = str(raw).strip()
+            dev = self.store.data["geraete"].setdefault(self.dev_id, {})
+            cur = dev.get("_leisten") if isinstance(dev.get("_leisten"), list) else []
+            cur = cur + [NO_STRIP] * (n - len(cur))
+            cur[n - 1] = choice
+            while cur and cur[-1] == NO_STRIP:
+                cur.pop()
+            dev["_leisten"] = cur
         self.store.save()
-        log.info("Steckdosenleisten %s: %s", self.dev_id, raw or "(keine)")
-        return str(raw).strip()
+        log.info("Steckdosenleiste %s/%d: %s", self.dev_id, n, choice)
+        return cur
 
     def set_bereich(self, cat, raw):
         value = str(raw).strip().upper() in ("ON", "TRUE", "1")
