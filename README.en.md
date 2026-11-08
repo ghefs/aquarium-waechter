@@ -127,7 +127,7 @@ not (yet) available via the API. It would be great to have:
 5. **ION Director:** names of the measured values (Ca, Mg …)
 6. **Dosing pumps:** configured dosing amounts and times
 7. **Timers and pumps:** switching times and current flow programs
-8. **Power/mains monitoring:** its measured values, where available
+8. **Mains monitoring (LinMon):** power-failure state, so HA can report it
 9. **Multiple clients at once** – e.g. Home Assistant plus another tool
 10. *Later:* optional **write access with authentication**, e.g. start maintenance from Home Assistant
 

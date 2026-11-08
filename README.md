@@ -155,7 +155,7 @@ die GHL Connect anzeigt, sind über die API (noch) nicht abrufbar. Schön wäre:
 5. **ION-Director:** Bezeichnung der Messwerte (Ca, Mg …)
 6. **Dosierer:** eingestellte Dosiermengen und -zeiten
 7. **Timer und Pumpen:** Schaltzeiten und aktuelle Strömungsprogramme
-8. **Strom- und Netzüberwachung:** deren Messwerte, sofern vorhanden
+8. **Netzüberwachung (LinMon):** Stromausfall-Status, damit HA ihn melden kann
 9. **Mehrere Clients gleichzeitig** – z. B. Home Assistant und ein weiteres Tool
 10. *Später:* optionaler **Schreibzugriff mit Anmeldung**, z. B. Wartung aus Home Assistant starten
 
