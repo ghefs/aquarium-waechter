@@ -3,6 +3,10 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.3.2
+
+- Meldung „Belegung geändert“: Grenzwerte mit Komma (0,25 statt 0.25).
+
 ## 4.3.1
 
 - Texte und Rechtschreibung in Dashboard, Hilfetexten und Dokumentation korrigiert.

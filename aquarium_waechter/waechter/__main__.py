@@ -19,7 +19,7 @@ from .ghl import GhlClient, Inventory, ReadError, strips_from_choice
 from .haws import HaWs
 from .mqtt import Mqtt, MqttError
 from .notify import Notifier
-from .settings import REMINDER, SettingsStore, evaluate
+from .settings import REMINDER, SettingsStore, evaluate, fmt
 
 log = logging.getLogger("waechter")
 
@@ -122,7 +122,7 @@ class DeviceWorker(threading.Thread):
                 st = self.settings.get(it["key"])
                 info = ""
                 if st.get("enabled"):
-                    lim = [f"{l} {st[f]:g}" for l, f in (("Min", "min"), ("Max", "max")) if st.get(f)]
+                    lim = [f"{l} {fmt(st[f])}" for l, f in (("Min", "min"), ("Max", "max")) if st.get(f)]
                     info = f" – Überwachung bleibt an ({', '.join(lim) or 'Standardwerte'}), bitte prüfen"
                 prefix = it["label"].split(" · ")[0]
                 changed.append(f"• {prefix}: {old} → {it['name']}{info}")
