@@ -9,7 +9,7 @@ Beispiele für eigene Automationen.
 
 ## Kurz
 
-1. Bei **Konfiguration** die ProfiLux eintragen (Name und IP) → Add-on starten.
+1. Im Reiter **Konfiguration** die ProfiLux-Geräte eintragen (Name und IP-Adresse) → Add-on starten.
 2. In der Seitenleiste das Dashboard **Aquarium** öffnen – Werte und Einstellungen.
 3. Alarm aufs Handy: Einstellungsseite → **Alarm aufs Handy** → Handy einschalten,
    dann **„Test-Alarm senden“**.

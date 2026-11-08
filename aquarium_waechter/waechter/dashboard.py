@@ -221,7 +221,7 @@ def build(workers):
                 {"type": "heading", "heading": "Alarm aufs Handy"},
                 {"type": "markdown", "content": (
                     "Push an die **Home-Assistant-App**: hier je Handy einschalten. Störungen kommen "
-                    "als **kritische Benachrichtigung** (klingelt auch bei Stumm/Nicht stören – am "
+                    "als **kritische Benachrichtigung** (klingelt auch bei Stummschaltung und „Nicht stören“ – am "
                     "iPhone einmal *Kritische Hinweise* erlauben). Neues Handy? → „Geräte neu einlesen“. "
                     "Danach mit „Test-Alarm senden“ prüfen.")},
                 {"type": "entities", "state_color": True, "entities": [

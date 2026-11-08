@@ -16,8 +16,8 @@ bevor aus einer ausgefallenen Pumpe ein Notfall wird.
 > aquarium controllers and sends critical push (HA app) or Telegram alarms when a pump stops, a probe fails, the KH Director stops measuring or a
 > dosing container runs low. Documentation is in German – the add-on works worldwide.*
 
-Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencomputer
-(Meerwasser/Süßwasser) über die lokale GHL-API überwacht – mit Alarm aufs Handy (HA-App und/oder Telegram):
+Home-Assistant-Add-on, das einen oder mehrere Aquariencomputer **GHL ProfiLux 4**
+(Meer- und Süßwasser) über die lokale GHL-API überwacht – mit Alarm aufs Handy (HA-App und/oder Telegram):
 
 - Alle Werte in Home Assistant: Steckdosen (Zustand, Strom – gruppiert nach Leiste),
   Sensoren (Temperatur, pH, Leitwert/Salinität, Redox …), Niveau, Durchfluss,
@@ -50,7 +50,7 @@ Genau diese Lücke schließt der Wächter:
 - **Dosierbehälter:** rechtzeitig „Nachfüllen“, in ml und %.
 - **ProfiLux weg** (Stromausfall, WLAN, API nach Firmware-Update aus)? → Alarm.
 - Alles mit Verzögerung gegen Fehlalarme, Erinnerung und „Wieder OK“ – aufs Handy,
-  unabhängig von Cloud und App.
+  per HA-App und/oder Telegram.
 
 > **Kein offizielles Produkt von GHL.** Unabhängiges Open-Source-Projekt, nicht mit
 > GHL Advanced Technology verbunden oder von GHL unterstützt. „GHL“, „ProfiLux“ und
@@ -70,7 +70,7 @@ Genau diese Lücke schließt der Wächter:
 > (*Einstellungen → System → Backups*).
 
 1. **GHL-API einschalten** – in GHL Connect unter *System → GHL API* („Nur lesen“ genügt).
-   Nach jedem Firmware-Update ist sie wieder aus. ProfiLux braucht eine feste IP.
+   Nach jedem Firmware-Update ist sie wieder aus. Der ProfiLux braucht eine feste IP-Adresse.
 2. **MQTT:** *Einstellungen → Add-ons → Add-on-Store* → **Mosquitto broker** installieren
    und starten, dann unter *Geräte & Dienste* „MQTT gefunden“ → **Konfigurieren**.
 3. **Repository hinzufügen** und **Aquarium-Wächter** installieren:
@@ -86,7 +86,7 @@ Genau diese Lücke schließt der Wächter:
    ```
 
 5. Dashboard **Aquarium** in der Seitenleiste → Einstellungsseite:
-   **Steckdosenleisten** wählen, festlegen **was überwacht wird**, unter
+   **Steckdosenleisten** wählen, festlegen, **was überwacht wird**, unter
    **„Alarm aufs Handy“** das eigene Handy einschalten → **„Test-Alarm senden“**. 📱
 
 Schritt für Schritt mit Erklärungen: **[Wiki → Installation](https://github.com/ghefs/aquarium-waechter/wiki/Installation)**.
@@ -145,7 +145,7 @@ ProfiLux-Ausstattungen teilen (Issues).
 
 ## Haftungsausschluss
 
-Dieses Projekt wird **ohne jede Gewährleistung** bereitgestellt und die Nutzung
+Dieses Projekt wird **ohne jede Gewährleistung** bereitgestellt, und die Nutzung
 erfolgt **auf eigene Gefahr**. Für Schäden jeglicher Art – insbesondere an Tieren,
 Pflanzen, Aquarium, Technik, Gebäude oder Daten, für Folgeschäden sowie für
 ausgebliebene, verspätete oder falsche Meldungen – wird **keine Haftung**

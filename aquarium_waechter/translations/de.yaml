@@ -5,7 +5,7 @@ configuration:
       Pro ProfiLux: name und host (IP). Alles Weitere bequemer in HA auf der
       Einstellungsseite des Dashboards. Optional als Vorgabe: steckdosenleisten
       (Dosen je Leiste, z. B. „STDL=4 (ohne Strom), PAB=6“ – einfacher: in HA die Leisten auswählen).
-      Bereiche (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, licht)
+      Bereiche (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht)
       lassen sich bequemer in HA auf der Einstellungsseite an-/ausschalten.
       unbenannte_abfragen: auch Teile ohne Namen auslesen.
   telegram_chat_id:
@@ -17,7 +17,7 @@ configuration:
       Nicht nötig – bequemer in HA auf der Einstellungsseite unter „Alarm aufs Handy“ je
       Handy einschalten. Hier nur als Vorgabe: z. B. mobile_app_iphone_von_max, mehrere
       mit Komma. Störungen kommen als kritische Benachrichtigung (klingelt auch bei
-      Stumm/Nicht stören).
+      Stummschaltung und „Nicht stören“).
   telegram_token:
     name: Telegram-Bot-Token
     description: Leer lassen, wenn die Telegram-Integration in HA eingerichtet ist – dann wird deren Token benutzt.
@@ -33,7 +33,7 @@ configuration:
     name: Dashboard automatisch erzeugen
     description: Eigenes Dashboard „Aquarium“. Handänderungen werden erkannt und nicht überschrieben.
   start_meldung:
-    name: Telegram-Meldung beim Start
+    name: Meldung beim Start
   mqtt_host:
     name: Externer MQTT-Broker (Host)
     description: Nur ausfüllen, wenn NICHT das Mosquitto-Add-on benutzt wird.
