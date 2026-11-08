@@ -23,6 +23,8 @@ wenn Home Assistant selbst gerade hängt.
 > um zu beschreiben, mit welchen Geräten das Add-on funktioniert.
 > Ausgänge werden nur gelesen, niemals geschaltet.
 
+**→ Direkt zur [Installation](#installation)**
+
 ## Voraussetzungen
 
 1. **GHL-API am ProfiLux einschalten** – in GHL Connect unter *System → GHL API*
@@ -77,25 +79,86 @@ mqtt_password: geheim
 
 ## Installation
 
-1. *Einstellungen → Add-ons → Add-on-Store* → ⋮ → **Repositories** →
-   `https://github.com/ghefs/aquarium-waechter` hinzufügen.
-2. **Aquarium-Wächter** installieren.
-3. Reiter **Konfiguration** – Geräte eintragen (am einfachsten über *⋮ → Als YAML
-   bearbeiten*):
+> **Voraussetzung:** Home Assistant **OS** (oder „Supervised“) – nur dort gibt es
+> Add-ons. Bei Home Assistant „Container“ oder „Core“ fehlt der Add-on-Store.
+> Prüfen: *Einstellungen → System → Info* → „Installationsart“.
 
-   ```yaml
-   geraete:
-     - name: Riff
-       host: 192.168.1.50
-     - name: Quarantäne
-       host: 192.168.1.51
-       kh_director: false
-       dosierer: false
-   telegram_chat_id: "-1001234567890"
-   ```
+### Schritt 1 – Repository hinzufügen
 
-4. Starten. Nach 1–2 Minuten erscheint je ProfiLux ein Gerät unter *MQTT* und in der
-   Seitenleiste das Dashboard **Aquarium**.
+Knopf drücken (öffnet das eigene Home Assistant) und bestätigen:
+
+[![Repository zu Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fghefs%2Faquarium-waechter)
+
+<details><summary>Ohne Knopf (von Hand)</summary>
+
+*Einstellungen → Add-ons → Add-on-Store* → oben rechts **⋮ → Repositories** →
+`https://github.com/ghefs/aquarium-waechter` eintragen → **Hinzufügen** → Schließen.
+Danach die Seite neu laden (⋮ → Nach Updates suchen).
+</details>
+
+### Schritt 2 – Add-on installieren
+
+Im Add-on-Store erscheint der Abschnitt **Aquarium-Wächter** → Add-on anklicken →
+**Installieren**. Die erste Installation dauert ein paar Minuten (das Add-on wird
+auf dem eigenen Rechner gebaut).
+
+### Schritt 3 – MQTT
+
+Falls noch nicht vorhanden: **Mosquitto broker** installieren und MQTT einrichten –
+siehe [MQTT einrichten](#mqtt-einrichten--wozu-und-wie). Ohne MQTT startet das Add-on nicht.
+
+### Schritt 4 – ProfiLux eintragen
+
+Im Add-on den Reiter **Konfiguration** öffnen → oben rechts **⋮ → Als YAML
+bearbeiten** → Inhalt ersetzen, Namen und IP-Adressen anpassen → **Speichern**:
+
+```yaml
+geraete:
+  - name: Riff
+    host: 192.168.1.50
+  - name: Quarantäne
+    host: 192.168.1.51
+    kh_director: false
+    dosierer: false
+telegram_chat_id: ""
+intervall: 60
+dashboard: true
+```
+
+Ein ProfiLux genügt natürlich auch. Die Chat-ID kommt später (Abschnitt
+[Telegram](#telegram)) – leer gelassen werden Meldungen nur ins Log geschrieben.
+
+### Schritt 5 – Starten
+
+Reiter **Info** → **Starten** (am besten auch „Beim Booten starten“ und „Watchdog“
+anhaken). Im Reiter **Protokoll** steht nach ca. 1 Minute je Gerät z. B.
+`Inventar: 10 Steckdosen, 6 Sensoren, …`.
+
+Danach gibt es:
+- je ProfiLux ein Gerät unter *Einstellungen → Geräte & Dienste → MQTT*
+- in der Seitenleiste das Dashboard **Aquarium** mit Übersicht und Einstellungsseite
+
+Jetzt auf der Einstellungsseite festlegen, was überwacht wird
+(siehe [Überwachung einstellen](#überwachung-einstellen)).
+
+### Schritt 6 – optional: Telegram-Befehle und Shelly
+
+[![Blueprint Telegram-Befehle importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fghefs%2Faquarium-waechter%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faquarium_waechter%2Ftelegram_befehle.yaml)
+&nbsp;Telegram-Befehle (`/status`, `/werte` …) – siehe [Werte per Befehl abfragen](#werte-per-befehl-abfragen-optional)
+
+[![Blueprint Shelly importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fghefs%2Faquarium-waechter%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faquarium_waechter%2Fshelly_geraet_ueberwachen.yaml)
+&nbsp;Geräte an Shelly-Steckdosen überwachen – siehe [Shelly](#optional-shelly-steckdosen)
+
+### Updates
+
+Neue Versionen erscheinen in Home Assistant wie bei jedem Add-on unter
+*Einstellungen* (Update-Hinweis) → **Aktualisieren**. Einstellungen bleiben erhalten.
+
+### Deinstallieren
+
+Add-on deinstallieren. Die Entitäten verschwinden nicht automatisch: unter
+*Einstellungen → Geräte & Dienste → MQTT* die ProfiLux-Geräte löschen und das
+Dashboard **Aquarium** entfernen.
 
 ### Was wird ausgelesen?
 
@@ -238,7 +301,8 @@ sondern Home Assistant selbst – mit dem Blueprint
 wählen, welcher Leistungssensor, welche Grenzen und welches Benachrichtigungsziel.
 Wer keine Shellys hat, ignoriert ihn einfach.
 
-Import: *Einstellungen → Automationen → Blueprints → Blueprint importieren* →
+Import: Knopf in [Schritt 6](#schritt-6--optional-telegram-befehle-und-shelly) oder
+*Einstellungen → Automationen → Blueprints → Blueprint importieren* →
 `https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/shelly_geraet_ueberwachen.yaml`
 
 ## Entwicklung
