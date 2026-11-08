@@ -17,6 +17,10 @@ class HaError(Exception):
     pass
 
 
+class _Closed(OSError):
+    """Gegenseite hat die (z. B. lange ungenutzte) Verbindung geschlossen -> neu verbinden."""
+
+
 class HaWs:
     def __init__(self, url="ws://supervisor/core/websocket", token=None, timeout=30):
         self.url = urllib.parse.urlparse(url)
@@ -45,7 +49,7 @@ class HaWs:
         while len(buf) < n:
             chunk = self.sock.recv(min(65536, n - len(buf)))
             if not chunk:
-                raise HaError("Verbindung zu Home Assistant geschlossen")
+                raise _Closed("Verbindung zu Home Assistant geschlossen")
             buf += chunk
         return bytes(buf)
 
@@ -64,7 +68,7 @@ class HaWs:
             else:
                 data = self._recv_exact(n)
             if opcode == 8:
-                raise HaError("Home Assistant hat die Verbindung beendet")
+                raise _Closed("Home Assistant hat die Verbindung beendet")
             if opcode == 9:  # ping -> pong
                 self._send_frame(data, 10)
                 continue

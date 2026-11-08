@@ -3,6 +3,13 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.3.5
+
+- **Fehler behoben:** Das Dashboard wurde nach Änderungen (z. B. Bereich „Licht“ aus) nicht
+  aktualisiert, wenn die Verbindung zu Home Assistant länger ungenutzt war
+  („Dashboard nicht aktualisiert: Home Assistant hat die Verbindung beendet“). Das Add-on
+  verbindet sich jetzt automatisch neu.
+
 ## 4.3.4
 
 - **Dosierer ohne Behältergröße** (Füllstand wird im ProfiLux nicht geführt, z. B. Probenwasser,
