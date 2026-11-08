@@ -40,8 +40,9 @@ class DeviceWorker(threading.Thread):
         self.host = dev_cfg["host"]
         self.cfg = dev_cfg
         self.ghl = GhlClient(self.host, int(dev_cfg.get("port", 10002)))
-        self.inv = Inventory(self.ghl, dev_cfg)
         self.settings = app.store.device(uid, first=first)
+        self.inv = Inventory(self.ghl, dev_cfg, enabled=self.bereich, keep=self.kept)
+        self.inv.set_strips(self.leisten())
         app.store.unnamed_default[uid] = bool(dev_cfg.get("unbenannte_abfragen", False))
         self.items = []
         self.announced = False
@@ -58,6 +59,27 @@ class DeviceWorker(threading.Thread):
         self.items = self.inv.items(self.settings)
         self.announced = False
         self.app.dashboard_dirty.set()
+        self.wake.set()
+
+    def bereich(self, cat):
+        """Bereich (Steckdosen, Licht …) lesen? Schalter in HA, Standard aus der Konfiguration."""
+        return self.settings.bereich(cat, bool(self.cfg.get(cat, True)))
+
+    def kept(self, key):
+        """In HA ausdrücklich auf „Auslesen“ gestellt?"""
+        return self.app.store.data["geraete"].get(self.uid, {}).get(key, {}).get("aktiv") is True
+
+    def leisten(self):
+        """Aufteilung der Steckdosen auf Leisten – Textfeld in HA, Vorgabe aus der Konfiguration."""
+        return self.settings.leisten(self.cfg.get("steckdosenleisten") or "")
+
+    def leisten_changed(self):
+        self.inv.set_strips(self.leisten())
+        self._sig = None
+        self.items_changed()
+
+    def bereich_changed(self):
+        self.force_scan = True
         self.wake.set()
 
     def bridge_cfg(self, it):
@@ -94,7 +116,8 @@ class DeviceWorker(threading.Thread):
                 if st.get("enabled"):
                     lim = [f"{l} {st[f]:g}" for l, f in (("Min", "min"), ("Max", "max")) if st.get(f)]
                     info = f" – Überwachung bleibt an ({', '.join(lim) or 'Standardwerte'}), bitte prüfen"
-                changed.append(f"• {old} → {it['name']}{info}")
+                prefix = it["label"].split(" · ")[0]
+                changed.append(f"• {prefix}: {old} → {it['name']}{info}")
                 self.faults.pop(it["key"], None)
             names[it["key"]] = it["name"]
         self.app.store.save()
@@ -161,7 +184,7 @@ class DeviceWorker(threading.Thread):
             key = it["key"]
             st = self.settings.get(key)
             watched, ok, detail = evaluate(it, st, values)
-            if not st["aktiv"]:
+            if not st["aktiv"] or it["kind"] == "light":
                 self.faults.pop(key, None)
                 continue
             fault = watched and ok is False
@@ -174,19 +197,19 @@ class DeviceWorker(threading.Thread):
                 if not f["alerted"] and now - f["since"] >= delay:
                     f["alerted"], f["last"] = True, now
                     title = "Nachfüllen" if it["kind"] == "doser" else "STÖRUNG"
-                    self.notify(f"{title}: {it['name']}", detail, urgent=it["kind"] != "doser")
+                    self.notify(f"{title}: {it['label']}", detail, urgent=it["kind"] != "doser")
                 elif f["alerted"] and every and now - f["last"] >= every:
                     f["last"] = now
                     mins = int((now - f["since"]) / 60)
-                    self.notify(f"Noch immer: {it['name']}", f"{detail} (seit {mins} min)",
+                    self.notify(f"Noch immer: {it['label']}", f"{detail} (seit {mins} min)",
                                 urgent=it["kind"] != "doser")
             elif f and ok is not None:
                 if f["alerted"]:
-                    self.notify(f"Wieder OK: {it['name']}", detail, kind="ok")
+                    self.notify(f"Wieder OK: {it['label']}", detail, kind="ok")
                 self.faults.pop(key, None)
             pending = bool(f) and not f["alerted"] if fault else False
             try:
-                self.app.bridge.monitor(self, key, fault and not pending, watched, detail)
+                self.app.bridge.monitor(self, it, fault and not pending, watched, detail)
             except MqttError:
                 pass
 

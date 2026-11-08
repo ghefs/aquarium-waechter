@@ -1,5 +1,5 @@
 name: Aquarium-Wächter
-version: "4.0.4"
+version: "4.1.0"
 slug: aquarium_waechter
 # Fertige Images von GitHub Actions (.github/workflows/build.yaml); ohne diese Zeile baut HA selbst
 image: ghcr.io/ghefs/{arch}-aquarium-waechter
@@ -33,6 +33,9 @@ schema:
       durchfluss: bool?
       dosierer: bool?
       kh_director: bool?
+      ion_director: bool?
+      licht: bool?
+      steckdosenleisten: str?
       unbenannte_abfragen: bool?
   telegram_chat_id: str?
   telegram_token: password?

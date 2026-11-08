@@ -160,7 +160,74 @@ def guess_art(desc, value):
     return "Unbekannt"
 
 
-CATEGORIES = ("steckdosen", "sensoren", "niveau", "durchfluss", "dosierer", "kh_director")
+CATEGORIES = ("steckdosen", "sensoren", "niveau", "durchfluss", "dosierer", "kh_director", "ion_director",
+              "licht")
+CATEGORY_NAMES = {"steckdosen": "Steckdosen", "sensoren": "Sensoren (Temperatur, pH …)",
+                  "niveau": "Niveausensoren", "durchfluss": "Durchflusssensoren",
+                  "dosierer": "Dosierpumpen / Behälter", "kh_director": "KH-Director",
+                  "ion_director": "ION-Director (Ca, Mg …)",
+                  "licht": "Licht (Helligkeit)"}
+
+# Kurzbezeichnung der Sensor-Art – steht vorne im Namen ("pH · Becken")
+ART_SHORT = {"Temperatur": "Temperatur", "pH": "pH", "Redox": "Redox", "Leitwert (Meerwasser)": "Leitwert",
+             "Leitwert (Süßwasser)": "Leitwert", "Sauerstoff": "Sauerstoff"}
+
+
+def parse_strips(text):
+    """'Alt=4 (ohne Strom), PAB=6' oder '4,6' -> [(name, anzahl, misst_strom), ...]
+
+    Die GHL-API verrät nicht, welche Steckdose auf welcher Leiste sitzt –
+    Kanäle zählen einfach über alle Leisten durch. Ältere Leisten messen keinen
+    Strom (liefern immer 0 A) -> "(ohne Strom)" schaltet die Strom-Überwachung ab."""
+    out = []
+    for n, part in enumerate(p.strip() for p in str(text or "").replace(";", ",").split(",")):
+        if not part:
+            continue
+        current = not re.search(r"ohne\s*strom", part, re.I)
+        part = re.sub(r"\(?\s*ohne\s*strom\s*\)?", "", part, flags=re.I).strip()
+        name, _, count = part.rpartition("=")
+        try:
+            out.append((name.strip() or f"Leiste {n + 1}", int(count), current))
+        except ValueError:
+            log.warning("steckdosenleisten: '%s' nicht verstanden (Beispiel: 'Alt=4 (ohne Strom), PAB=6')", part)
+    return out
+
+
+def socket_pos(i, strips):
+    """Kanal-Index -> (Leistenname oder None, Bezeichnung '2.3' bzw. '5', misst Strom)."""
+    start = 0
+    for n, (name, count, current) in enumerate(strips):
+        if i < start + count:
+            return name, f"{n + 1}.{i - start + 1}", current
+        start += count
+    return None, str(i + 1), True
+
+
+# Indexbereiche laut GHL-API-Referenz (Dokumentversion 1.1)
+MAX = {"switch": 64, "sensor": 32, "level": 16, "flow": 4, "doser": 32, "light": 32, "ion": 5}
+
+# Statusbits im Messprotokoll (DATARECORD, 5. Feld)
+SENSOR_ALARM, SENSOR_ERROR, SENSOR_COMM = 256, 512, 1024
+KH_RANGE, KH_LEAK = 32, 128
+
+
+def trim(slots, prefix, keep=lambda key: False):
+    """Unbenannte Plätze hinter dem letzten benannten weglassen (leere Steckplätze) –
+    außer sie wurden in HA ausdrücklich auf „Auslesen“ gestellt."""
+    while slots and not slots[-1]["named"] and not keep(f"{prefix}_{slots[-1]['i']}"):
+        slots.pop()
+    return slots
+
+
+def record_status(raw):
+    """'1785233341,24.41,75.94,0,0' -> (zeit, status) oder (None, None)"""
+    parts = str(raw).split(",")
+    try:
+        t = float(parts[0])
+        # ältere Firmware liefert nur die Zeit (ohne Messwerte und Status)
+        return t, int(float(parts[4])) if len(parts) >= 5 else None
+    except (ValueError, IndexError):
+        return None, None
 
 
 class Inventory:
@@ -168,17 +235,24 @@ class Inventory:
     {"key", "kind", "name", "named", ...}. Abgefragt werden nur aktive Items
     (Einstellung "aktiv"); unbenannte sind standardmäßig nicht aktiv."""
 
-    def __init__(self, ghl, dev_cfg):
+    def __init__(self, ghl, dev_cfg, enabled=None, keep=None):
         self.ghl = ghl
         self.cfg = dev_cfg
+        self.enabled = enabled or (lambda cat: dev_cfg.get(cat, True))
+        self.keep = keep or (lambda key: False)
+        self.strips = []
         self.meta = {}
         self.channels, self.sensors, self.levels = [], [], []
-        self.flows, self.dosers = [], []
+        self.flows, self.dosers, self.lights, self.ions = [], [], [], []
+
+    def set_strips(self, text):
+        self.strips = parse_strips(text)
         self.kh = False
+        self.status_bits = False
         self.scanned = False
 
     def on(self, category):
-        return self.cfg.get(category, True)
+        return self.enabled(category)
 
     def scan(self):
         g = self.ghl
@@ -190,16 +264,21 @@ class Inventory:
 
         self.channels = []
         if self.on("steckdosen"):
-            for i in range(32):
+            for i in range(MAX["switch"]):
                 if g.try_get(f"GET SWITCHCHANNEL[{i}] ACTSTATE") is None:
+                    if i >= 32:
+                        break
                     continue
                 name = desc(f"GET SWITCHCHANNEL[{i}] DESCRIPTION")
+                if i >= 32 and not name and not self.keep(f"switch_{i}"):
+                    continue  # leere Plätze der großen Ausbaustufe – trim() wirft sie ohnehin weg
                 current = g.try_get(f"GET SWITCHCHANNEL[{i}] ACTCURRENT") is not None
                 self.channels.append({"i": i, "name": name or f"Steckdose {i + 1}",
                                       "named": bool(name), "current": current})
+            trim(self.channels, "switch", self.keep)
         self.sensors = []
         if self.on("sensoren"):
-            for i in range(16):
+            for i in range(MAX["sensor"]):
                 v = g.try_get(f"GET SENSOR[{i}] ACTVALUE")
                 if v is None:
                     continue
@@ -212,66 +291,115 @@ class Inventory:
                                      "guess": guess_art(name, v)})
         self.levels = []
         if self.on("niveau"):
-            for i in range(8):
+            for i in range(MAX["level"]):
                 if g.try_get(f"GET LEVELSENSOR[{i}] ACTSTATE") is None:
                     continue
                 name = desc(f"GET LEVELSENSOR[{i}] DESCRIPTION")
                 self.levels.append({"i": i, "name": name or f"Niveau {i + 1}", "named": bool(name)})
+            trim(self.levels, "level", self.keep)
         self.flows = []
         if self.on("durchfluss"):
-            for i in range(4):
+            for i in range(MAX["flow"]):
                 if g.try_get(f"GET FLOWSENSOR[{i}] ACTFLOW") is None:
                     continue
                 name = desc(f"GET FLOWSENSOR[{i}] DESCRIPTION")
                 self.flows.append({"i": i, "name": name or f"Durchfluss {i + 1}", "named": bool(name)})
         self.dosers = []
         if self.on("dosierer"):
-            for i in range(16):
+            for i in range(MAX["doser"]):
                 name = g.try_get(f"GET DOSER[{i}] DESCRIPTION")
                 if name is None or g.try_get(f"GET DOSER[{i}] FILLLEVEL") is None:
                     continue
                 name = name.strip()
-                self.dosers.append({"i": i, "name": name or f"Dosierer {i + 1}", "named": bool(name)})
+                try:
+                    cap = float(g.try_get(f"GET DOSER[{i}] CAPACITY") or 0)
+                except ValueError:
+                    cap = 0.0
+                self.dosers.append({"i": i, "name": name or f"Dosierer {i + 1}", "named": bool(name),
+                                    "capacity": cap})
+            trim(self.dosers, "doser", self.keep)
         self.kh = self.on("kh_director") and g.try_get("GET KHDIRECTOR ACTVALUE") is not None
+        # Statusbits im Messprotokoll gibt es erst ab Firmware 7.52
+        self.status_bits = bool(self.sensors) and "," in (
+            g.try_get(f"GET SENSOR[{self.sensors[0]['i']}] DATARECORD[0]") or "")
+        self.ions = []
+        if self.on("ion_director"):
+            for i in range(MAX["ion"]):
+                if g.try_get(f"GET IONDIRECTOR[{i}] ACTVALUE") is None:
+                    break
+                self.ions.append({"i": i, "name": f"Wert {i + 1}", "named": True})
+        self.lights = []
+        if self.on("licht"):
+            for i in range(MAX["light"]):
+                name = g.try_get(f"GET ILLUMINATION[{i}] DESCRIPTION")
+                if name is None:
+                    break
+                name = name.strip()
+                self.lights.append({"i": i, "name": name or f"Licht {i + 1}", "named": bool(name)})
+            trim(self.lights, "light", self.keep)
         self.scanned = True
-        log.info("Inventar: %d Steckdosen, %d Sensoren, %d Niveau, %d Durchfluss, %d Dosierer, KH-Director: %s",
-                 len(self.channels), len(self.sensors), len(self.levels), len(self.flows),
-                 len(self.dosers), "ja" if self.kh else "nein")
+        log.info("Inventar: %d Steckdosen, %d Sensoren, %d Niveau, %d Durchfluss, %d Dosierer, "
+                 "%d Lichtkanäle, KH-Director: %s, ION-Director: %s", len(self.channels), len(self.sensors),
+                 len(self.levels), len(self.flows), len(self.dosers), len(self.lights),
+                 "ja" if self.kh else "nein", "ja" if self.ions else "nein")
 
     def signature(self):
         """Ändert sich, wenn Teile/Namen dazukommen/wegfallen (-> Discovery/Dashboard neu)."""
         return repr((self.channels, [(s["i"], s["name"]) for s in self.sensors],
-                     self.levels, self.flows, self.dosers, self.kh))
+                     self.levels, self.flows, self.dosers, self.lights, self.ions, self.kh,
+                     self.strips))
 
     # ---- Items (alles, was in HA erscheint / überwacht werden kann)
     def items(self, settings):
         """-> Liste von dicts: key, kind, name, named, unit, device_class, cmd, ..."""
         out = []
+
+        def label(prefix, it):
+            if not it["named"] or it["name"].lower() == prefix.lower():
+                return prefix
+            return f"{prefix} · {it['name']}"
+
         for c in self.channels:
+            strip, pos, measures = socket_pos(c["i"], self.strips)
             out.append({"key": f"switch_{c['i']}", "kind": "switch", "name": c["name"],
-                        "named": c["named"], "unit": "A", "current": c["current"], "i": c["i"]})
+                        "label": label(f"Steckdose {pos}", c), "strip": strip,
+                        "named": c["named"], "unit": "A", "current": c["current"] and measures, "i": c["i"]})
         for s in self.sensors:
             art = settings.get(f"sensor_{s['i']}").get("art") or s["guess"]
-            for u, label, unit, dc in SENSOR_ARTS.get(art, SENSOR_ARTS["Unbekannt"]):
+            for u, extra, unit, dc in SENSOR_ARTS.get(art, SENSOR_ARTS["Unbekannt"]):
                 base = s["name"]
-                name = (f"{base} {label}" if label else base)
+                name = (f"{base} {extra}" if extra else base)
+                short = extra or ART_SHORT.get(art) or f"Sensor {s['i'] + 1}"
+                lab = base if short.lower() in base.lower() and not extra else f"{short} · {base}"
                 out.append({"key": f"sensor_{s['i']}" + ("" if u is None else f"_{u}"),
-                            "kind": "value", "name": name, "named": True, "unit": unit or "",
+                            "kind": "value", "name": name, "label": lab,
+                            "named": True, "unit": unit or "",
                             "device_class": dc, "i": s["i"], "main": u is None, "art": art,
                             "cmd": f"GET SENSOR[{s['i']}] ACTVALUE" + ("" if u is None else f"[{u}]")})
         for l in self.levels:
             out.append({"key": f"level_{l['i']}", "kind": "level", "name": l["name"],
+                        "label": label(f"Niveau {l['i'] + 1}", l),
                         "named": l["named"], "unit": "", "i": l["i"]})
         for f in self.flows:
             out.append({"key": f"flow_{f['i']}", "kind": "value", "name": f["name"], "named": f["named"],
+                        "label": label(f"Durchfluss {f['i'] + 1}", f),
                         "unit": "", "i": f["i"], "cmd": f"GET FLOWSENSOR[{f['i']}] ACTFLOW"})
         if self.kh:
-            out.append({"key": "kh", "kind": "value", "name": "KH", "named": True, "unit": "dKH",
-                        "cmd": "GET KHDIRECTOR ACTVALUE"})
-            out.append({"key": "kh_age", "kind": "age", "name": "KH-Messung", "named": True, "unit": "h"})
+            out.append({"key": "kh", "kind": "value", "name": "KH", "label": "KH-Director · KH-Wert",
+                        "named": True, "unit": "dKH", "cmd": "GET KHDIRECTOR ACTVALUE"})
+            out.append({"key": "kh_age", "kind": "age", "name": "KH-Messung",
+                        "label": "KH-Director · letzte Messung", "named": True, "unit": "h"})
+        for n in self.ions:
+            out.append({"key": f"ion_{n['i']}", "kind": "value", "name": f"ION-Director {n['name']}",
+                        "label": f"ION-Director · {n['name']}", "named": True, "unit": "", "i": n["i"],
+                        "cmd": f"GET IONDIRECTOR[{n['i']}] ACTVALUE", "soll": f"GET IONDIRECTOR[{n['i']}] DESVALUE"})
         for d in self.dosers:
             out.append({"key": f"doser_{d['i']}", "kind": "doser", "name": d["name"],
+                        "label": label(f"Dosierer {d['i'] + 1}", d), "capacity": d.get("capacity", 0),
                         "named": d["named"], "unit": "ml", "i": d["i"]})
+        for l in self.lights:
+            out.append({"key": f"light_{l['i']}", "kind": "light", "name": l["name"],
+                        "label": label(f"Licht {l['i'] + 1}", l), "named": l["named"], "unit": "%", "i": l["i"]})
         return out
 
     def read(self, items, settings):
@@ -298,16 +426,29 @@ class Inventory:
                     put(f"{k}_current", f"GET SWITCHCHANNEL[{it['i']}] ACTCURRENT")
             elif kind == "value":
                 put(k, it["cmd"])
-                if it.get("main") or k == "kh":
-                    soll = "GET KHDIRECTOR DESVALUE" if k == "kh" else f"GET SENSOR[{it['i']}] DESVALUE"
+                if it.get("main") or k == "kh" or it.get("soll"):
+                    soll = it.get("soll") or ("GET KHDIRECTOR DESVALUE" if k == "kh"
+                                              else f"GET SENSOR[{it['i']}] DESVALUE")
                     put(f"{k}_soll", soll)
+                if it.get("main") and self.status_bits:
+                    # Status des letzten Protokolleintrags: Alarm / Sensorfehler laut ProfiLux
+                    put(f"{k}_status", f"GET SENSOR[{it['i']}] DATARECORD[0]",
+                        lambda v: record_status(v)[1])
             elif kind == "level":
                 put(k, f"GET LEVELSENSOR[{it['i']}] ACTSTATE", lambda v: round(float(v)))
             elif kind == "doser":
                 put(k, f"GET DOSER[{it['i']}] FILLLEVEL")
+                if it.get("capacity") and k in values:
+                    values[f"{k}_pct"] = round(min(100.0, values[k] / it["capacity"] * 100), 1)
+            elif kind == "light":
+                put(k, f"GET ILLUMINATION[{it['i']}] ACTBRIGHTNESS", lambda v: round(float(v), 1))
             elif kind == "age":
                 # DATARECORD[0] = Zeitpunkt der letzten Messung (Unix-Zeit als float32, ±1 min)
-                put("kh_last", "GET KHDIRECTOR DATARECORD[0]")
-                if values.get("kh_last", 0) <= 1e9:
-                    values.pop("kh_last", None)
+                # Antwort: "zeit,kh,0,0,status" (ältere Firmware: nur die Zeit als Zahl)
+                put("kh_record", "GET KHDIRECTOR DATARECORD[0]", record_status)
+                t, status = values.pop("kh_record", (None, None))
+                if t and t > 1e9:
+                    values["kh_last"] = t
+                if status is not None:
+                    values["kh_status"] = status
         return values

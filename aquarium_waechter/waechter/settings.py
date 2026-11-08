@@ -21,6 +21,8 @@ DEFAULTS = {
     "doser": {"aktiv": None, "enabled": False, "min": 500.0, "delay": 0.0},
     # KH-Director misst typ. alle 4–5 h -> Warnung nach 7 h ohne Messung, standardmäßig an
     "age": {"aktiv": None, "enabled": True, "max": 7.0, "delay": 0.0},
+    # Licht: nur anzeigen – die Helligkeit ändert sich über den Tag, ein Alarm wäre sinnlos
+    "light": {"aktiv": None},
 }
 
 # Erinnerung bei anhaltender Störung: Behälter nur 1x täglich
@@ -30,7 +32,7 @@ REMINDER = {"doser": 24 * 3600}
 def kind_of(key):
     if key == "kh_age":
         return "age"
-    for prefix in ("switch", "level", "doser"):
+    for prefix in ("switch", "level", "doser", "light"):
         if key.startswith(prefix + "_"):
             return prefix
     return "value"
@@ -51,6 +53,31 @@ class DeviceSettings:
 
     def set(self, key, field, raw):
         return self.store.set(self.dev_id, key, field, raw)
+
+    # Bereiche (Steckdosen, Licht …) – in HA schaltbar, Standard aus der Add-on-Konfiguration
+    def bereich(self, cat, default=True):
+        v = self.store.data["geraete"].get(self.dev_id, {}).get("_bereiche", {}).get(cat)
+        return default if v is None else v
+
+    def leisten(self, default=""):
+        v = self.store.data["geraete"].get(self.dev_id, {}).get("_leisten")
+        return default if v is None else v
+
+    def set_leisten(self, raw):
+        with self.store.lock:
+            self.store.data["geraete"].setdefault(self.dev_id, {})["_leisten"] = str(raw).strip()
+        self.store.save()
+        log.info("Steckdosenleisten %s: %s", self.dev_id, raw or "(keine)")
+        return str(raw).strip()
+
+    def set_bereich(self, cat, raw):
+        value = str(raw).strip().upper() in ("ON", "TRUE", "1")
+        with self.store.lock:
+            dev = self.store.data["geraete"].setdefault(self.dev_id, {})
+            dev.setdefault("_bereiche", {})[cat] = value
+        self.store.save()
+        log.info("Bereich %s/%s: %s", self.dev_id, cat, "an" if value else "aus")
+        return value
 
     def setdefault(self, key, field, value):
         dev = self.store.data["geraete"].setdefault(self.dev_id, {})
@@ -122,7 +149,48 @@ class SettingsStore:
 
 
 def fmt(v, unit=""):
-    return f"{v:.3f}".rstrip("0").rstrip(".") + (f" {unit}" if unit else "")
+    """Zahl deutsch formatiert, ohne überflüssige Nullen: 0,25 A"""
+    return f"{v:.3f}".rstrip("0").rstrip(".").replace(".", ",") + (f" {unit}" if unit else "")
+
+
+de = fmt
+
+
+def rule(item, st):
+    """Klartext, wann ein Alarm kommt – steht im Dashboard neben den Einstellungen."""
+    kind, unit = item["kind"], item.get("unit", "")
+    if not st["aktiv"]:
+        return "Wird nicht ausgelesen."
+    if kind == "light":
+        return "Nur Anzeige (kein Alarm – die Helligkeit ändert sich über den Tag)."
+    later = f", wenn das länger als {de(st['delay'])} min anhält" if st.get("delay") else " (sofort)"
+    if kind == "switch":
+        if not item.get("current"):
+            return "Nur Anzeige an/aus – diese Steckdose misst keinen Strom, daher kein Alarm möglich."
+        if not st["enabled"]:
+            return "Kein Alarm (Überwachung aus)."
+        txt = f"Alarm, wenn die Steckdose AN ist, aber weniger als {de(st['min'], 'A')} fließen (Gerät läuft nicht)"
+        if st["max"] > 0:
+            txt += f" oder mehr als {de(st['max'], 'A')}"
+        return txt + later + "."
+    if kind == "level":
+        if st["mode"] == "Aus":
+            return "Kein Alarm (Auswahl „Alarm bei“ steht auf Aus)."
+        return f"Alarm, wenn der Niveausensor {st['mode'][-1]} meldet{later}."
+    if kind == "age":
+        if not st["enabled"]:
+            return "Kein Alarm (Überwachung aus)."
+        return (f"Alarm, wenn der KH-Director länger als {de(st['max'], 'h')} nicht gemessen hat "
+                "(sowie bei Leck- oder Messbereichsalarm, ab ProfiLux-Firmware 7.52).")
+    if kind == "doser":
+        if not st["enabled"]:
+            return "Kein Alarm (Überwachung aus)."
+        return f"Meldung „Nachfüllen“, wenn weniger als {de(st['min'], 'ml')} im Behälter sind (1× täglich)."
+    if not st["enabled"]:
+        return "Kein Alarm (Überwachung aus)."
+    if st["min"] >= st["max"]:
+        return "⚠️ Grenzen ungültig: Minimum muss kleiner als Maximum sein."
+    return f"Alarm, wenn der Wert unter {de(st['min'], unit)} oder über {de(st['max'], unit)} liegt{later}."
 
 
 def evaluate(item, st, values):
@@ -144,6 +212,9 @@ def evaluate(item, st, values):
         if st["max"] > 0 and cur > st["max"]:
             return watched, False, f"Strom zu hoch: {fmt(cur, 'A')} (Maximum {fmt(st['max'], 'A')})"
         return watched, True, f"an, {fmt(cur, 'A')}"
+    if kind == "light":
+        v = values.get(key)
+        return False, True if v is not None else None, "kein Wert" if v is None else fmt(v, "%")
     if kind == "level":
         watched = st["mode"] != "Aus"
         v = values.get(key)
@@ -154,14 +225,19 @@ def evaluate(item, st, values):
         return watched, True, f"Zustand {v}"
     if kind == "age":
         watched, t = st["enabled"], values.get("kh_last")
+        status = values.get("kh_status") or 0
+        if status & 128:
+            return watched, False, "KH-Director meldet LECK-Alarm!"
+        if status & 32:
+            return watched, False, "KH-Director meldet Messbereichsalarm (Wert außerhalb des Bereichs)"
         if t is None:
             return watched, None, "kein Wert"
         age = (time.time() - t) / 3600
         when = datetime.datetime.fromtimestamp(t).strftime("%d.%m. %H:%M")
         if age > st["max"]:
-            return watched, False, (f"Letzte Messung vor {age:.1f} h ({when}) – "
+            return watched, False, (f"Letzte Messung vor {fmt(round(age, 1), 'h')} ({when}) – "
                                     f"Reagenz/Referenz leer oder Director gestört?")
-        return watched, True, f"vor {age:.1f} h ({when})"
+        return watched, True, f"vor {fmt(round(age, 1), 'h')} ({when})"
     if kind == "doser":
         watched, v = st["enabled"], values.get(key)
         if v is None:
@@ -169,13 +245,19 @@ def evaluate(item, st, values):
         if not watched:
             return watched, True, f"{v:.0f} ml"
         if v < st["min"]:
-            return watched, False, f"Behälter fast leer: noch {v:.0f} ml (Warnung unter {st['min']:.0f} ml)"
+            pct = values.get(f"{key}_pct")
+            rest = f"noch {v:.0f} ml" + (f" ({pct:.0f} %)" if pct is not None else "")
+            return watched, False, f"Behälter fast leer: {rest} (Meldung unter {st['min']:.0f} ml)"
         return watched, True, f"{v:.0f} ml"
     watched, v = st["enabled"], values.get(key)
+    status = values.get(f"{key}_status") or 0
+    if status & 1536:  # Sensorfehler / Kommunikationsfehler laut ProfiLux (ab Firmware 7.52)
+        return watched, False, "ProfiLux meldet Sensorfehler – Sonde/Kabel prüfen"
     if v is None:
         return watched, None, "kein Wert"
+    note = " (ProfiLux meldet Alarm)" if status & 256 else ""
     if not watched:
-        return watched, True, fmt(v, unit)
+        return watched, True, fmt(v, unit) + note
     if st["min"] >= st["max"]:
         return watched, True, f"{fmt(v, unit)} (Grenzen ungültig: Min ≥ Max)"
     if v < st["min"]:

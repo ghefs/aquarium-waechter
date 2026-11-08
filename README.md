@@ -3,9 +3,10 @@
 Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencomputer
 (Meerwasser/Süßwasser) über die lokale GHL-API überwacht – mit Telegram-Alarm:
 
-- Alle Werte in Home Assistant: Steckdosen (Zustand, Strom), Sensoren (Temperatur,
-  pH, Leitwert/Salinität, Redox …), Niveau, KH-Director (Wert und Zeitpunkt der
-  letzten Messung), Füllstände der Dosierbehälter
+- Alle Werte in Home Assistant: Steckdosen (Zustand, Strom – gruppiert nach Leiste),
+  Sensoren (Temperatur, pH, Leitwert/Salinität, Redox …), Niveau, Durchfluss,
+  KH-Director, ION-Director, Füllstände der Dosierbehälter (ml und %), Licht
+  (Helligkeit je Kanal). Was genau geht und was nicht: [Was wird ausgelesen?](#was-wird-ausgelesen)
 - **Alarm per Telegram**, wenn etwas nicht stimmt: Pumpe steht (zu wenig Strom),
   Temperatur außerhalb der Grenzen, Dosierbehälter fast leer, keine KH-Messung mehr,
   ProfiLux nicht erreichbar. Mit Verzögerung, Erinnerung und „Wieder OK“
@@ -179,35 +180,97 @@ Dashboard **Aquarium** entfernen.
 ### Was wird ausgelesen?
 
 Der Wächter fragt beim Start ab, was der ProfiLux hat, und legt nur das an.
+Alles mit **Lesezugriff** – der Wächter schaltet nie etwas.
+
+| Bereich | Was in HA erscheint | Alarm möglich | Lücken / Hinweise |
+|---|---|---|---|
+| Steckdosen (bis 64) | an/aus, Strom in A | Strom zu niedrig (Gerät läuft nicht) / zu hoch | Schalten geht nicht (API nur lesend). Leisten ohne Strommessung melden immer 0 A → als „ohne Strom“ eintragen |
+| Sensoren (bis 32) | Messwert, Sollwert; Leitwert zusätzlich Salinität und Dichte | unter Minimum / über Maximum; Sensorfehler laut ProfiLux¹ | Die Sensor-**Art** liefert die API nicht – sie wird geschätzt und ist in HA wählbar |
+| Niveausensoren (bis 16) | Zustand 0/1 | bei 0 oder bei 1 | Welcher Wert „Alarm“ bedeutet, mit dem Schwimmer ausprobieren |
+| Durchfluss (bis 4) | Durchfluss | unter/über Grenze | Einheit liefert die API nicht |
+| Dosierer (bis 32) | Füllstand in ml und % | „Nachfüllen“ unter X ml (1× täglich) | Dosiermengen/-zeiten nicht |
+| KH-Director | KH-Wert, Sollwert, Zeit der letzten Messung | keine Messung seit X h; Leck- und Messbereichsalarm¹ | |
+| ION-Director | 5 Messwerte mit Sollwert | unter/über Grenze | Ohne Testgerät entwickelt – Namen der Werte (Ca, Mg …) liefert die API nicht |
+| Licht (bis 32 Kanäle) | aktuelle Helligkeit in % | – (ändert sich über den Tag) | Tageskurven, Lichtszenen nicht |
+| **Nicht verfügbar** | Steckdosenleisten-Zuordnung (PAB-Geräte), Timer-Schaltzeiten, Pumpen-/Strömungsmodi, Fütterungspause/Wartung (Zustand), die Alarmliste des ProfiLux, Firmware/Uhrzeit bei älterer Firmware | | Gibt die GHL-API nicht her |
+
+¹ Erst ab ProfiLux-Firmware **7.52** (dann enthält das Messprotokoll Statusbits).
+Mit älterer Firmware fehlen nur diese Zusatzalarme, alles andere geht.
+
 Feinsteuerung auf drei Ebenen:
 
 | Ebene | Wo | Beispiel |
 |---|---|---|
-| Bereich ganz aus | Add-on-Konfiguration je Gerät: `steckdosen`, `sensoren`, `niveau`, `durchfluss`, `dosierer`, `kh_director` (Standard: an) | Becken ohne KH-Director: `kh_director: false` |
-| Unbenannte mitnehmen | `unbenannte_abfragen: true` | Kunde hat Steckdosen in GHL nicht benannt |
-| Einzelnes Teil | In HA: Schalter **„… abfragen“** auf der Einstellungsseite | Ungenutzten Dosierer ausblenden |
+| Ganzer Bereich | Dashboard → Einstellungsseite → **Bereiche** (Standard: alle an; Vorgabe auch per Add-on-Konfiguration `steckdosen`, `sensoren`, `niveau`, `durchfluss`, `dosierer`, `kh_director`, `ion_director`, `licht`) | Licht interessiert nicht → „Licht (Helligkeit)“ aus |
+| Unbenannte mitnehmen | Add-on-Konfiguration `unbenannte_abfragen: true` | Kunde hat Steckdosen in GHL nicht benannt |
+| Einzelnes Teil | Einstellungsseite: Schalter **„Auslesen“** | Ungenutzten Dosierer ausblenden |
 
-Standardmäßig wird abgefragt, was in GHL Connect **einen Namen hat**. Weniger
-abfragen = schnellere Runden (jeder Wert kostet ca. 0,4 s).
+Standardmäßig wird ausgelesen, was in GHL Connect **einen Namen hat**; leere Plätze
+am Ende (z. B. Steckdose 11–64) werden gar nicht erst angelegt. Weniger auslesen =
+schnellere Runden (jeder Wert kostet ca. 0,4 s). Mit dem Knopf **„Geräte neu
+einlesen“** wird das Inventar sofort neu gelesen (sonst stündlich) – z. B. nach
+Umbenennen in GHL Connect.
 
-Mit dem Knopf **„Geräte neu einlesen“** wird das Inventar sofort neu gelesen
-(sonst stündlich) – z. B. nach Umbenennen in GHL Connect.
+### Namen und Kürzel
+
+Jeder Name beginnt mit einem Kürzel, damit man immer weiß, was gemeint ist:
+
+| Kürzel | Bedeutung |
+|---|---|
+| `Steckdose 5 · Heizer` | Steckdose 5 (ohne Leisten-Angabe einfach durchgezählt) |
+| `Steckdose 2.3 · Heizer` | Leiste 2, Dose 3 (mit [Steckdosenleisten](#steckdosenleisten)) |
+| `Temperatur · Becken`, `pH · Sonde 2`, `Salinität · Leitwert` | Sensor nach Art |
+| `Niveau 1 · …`, `Durchfluss 1 · …`, `Dosierer 4 · Kalium`, `Licht 1 · Weiß` | Art und Nummer wie in GHL Connect |
+| `KH-Director · …`, `ION-Director · …` | Messgeräte |
+
+Die Zahlen entsprechen der Zählung in GHL Connect (ab 1).
+
+### Steckdosenleisten
+
+Die GHL-API verrät nicht, welche Steckdose auf welcher Leiste sitzt – sie zählt die
+Steckdosen einfach über alle Leisten durch. Die Aufteilung trägt man deshalb einmal je
+Gerät ein, **in der Reihenfolge der Kanäle** (wie in GHL Connect unter den
+Steckdosen bzw. PAB-Geräten zu sehen): Dashboard → Einstellungsseite →
+**Steckdosenleisten → Aufteilung**, z. B.
+
+```
+Alt=4 (ohne Strom), PAB=6
+```
+
+Das heißt: Kanal 1–4 sind die Leiste „Alt“, Kanal 5–10 die Leiste „PAB“. Ergebnis:
+Namen wie `Steckdose 2.1 · Strömungspumpe`, im Dashboard je Leiste ein eigener Block.
+`(ohne Strom)` kennzeichnet Leisten **ohne Strommessung** (ältere Leisten liefern
+immer 0 A) – dort gibt es dann keinen sinnlosen Strom-Alarm, nur die Anzeige an/aus.
+Nur Zahlen gehen auch: `4,6` → „Leiste 1“, „Leiste 2“. Leer = einfach durchzählen.
+Für viele Geräte auf einmal geht es auch in der Add-on-Konfiguration als Vorgabe
+(`steckdosenleisten: "Alt=4 (ohne Strom), PAB=6"` je Gerät).
 
 ### Überwachung einstellen
 
-Auf der Einstellungsseite des Dashboards, je Teil:
+Auf der Einstellungsseite des Dashboards steht je Teil zuerst **„So wird überwacht“** –
+ein Satz, der die aktuelle Regel zusammenfasst, z. B.:
 
-- **Überwachen** an/aus
-- **Minimum / Maximum** – Steckdosen: Strom in A (Pumpe steht → Strom fällt);
-  Messwerte: zulässiger Bereich; Dosierer: „Warnen unter“ ml;
-  KH-Messung: Alarm, wenn seit X Stunden keine Messung mehr erfolgt ist
-  (Standard: an, 7 h – der KH-Director misst typischerweise alle 4–5 h)
-- **Verzögerung** – so lange muss die Störung anstehen, bevor gemeldet wird
-- Niveau: **Alarm bei 0 / bei 1** (am besten mit dem Schwimmer ausprobieren)
-- Sensoren: **Art** (Temperatur, pH, Leitwert …) – bestimmt Einheit und Zusatzwerte
-  (Salinität, Dichte). Wird beim ersten Start aus Name und Wert geschätzt
+> Alarm, wenn die Steckdose AN ist, aber weniger als 0,25 A fließen (Gerät läuft
+> nicht), wenn das länger als 2 min anhält.
 
-Die Einstellungen speichert das Add-on selbst; sie überleben Neustarts und Updates.
+Darunter die Einstellungen:
+
+| Einstellung | Bedeutung |
+|---|---|
+| **Auslesen** | Wert wird gelesen und in HA angezeigt (aus = Teil verschwindet aus HA) |
+| **Alarm per Telegram** | Nur wenn an, wird gemeldet |
+| **Alarm, wenn AN und Strom unter** | Steckdosen: Pumpe steht → Strom fällt. Wert etwas unter dem normalen Strom wählen |
+| **Alarm, wenn Strom über (0 = aus)** | Steckdosen: z. B. blockierte Pumpe |
+| **Alarm, wenn Wert unter / über** | Messwerte: zulässiger Bereich |
+| **Nachfüllen melden unter** | Dosierer, in ml |
+| **Alarm, wenn keine Messung seit** | KH-Director (Standard: an, 7 h – er misst typischerweise alle 4–5 h) |
+| **Alarm, wenn Sensor meldet** | Niveau: 0 oder 1 |
+| **Alarm erst nach (Dauer)** | So lange muss die Störung anstehen – kurze Ausreißer lösen nichts aus |
+| **Sensor-Art (für Einheit)** | Temperatur, pH, Leitwert … – bestimmt Einheit und Zusatzwerte (Salinität, Dichte) |
+
+Auf der Übersichtsseite listet **„So wird überwacht“** alle überwachten Punkte mit
+Regel und aktuellem Zustand. Die Einstellungen speichert das Add-on selbst; sie
+überleben Neustarts und Updates.
 
 ### Dosierbehälter neu belegt / Steckdose umgesteckt
 
@@ -215,8 +278,8 @@ Entitäten hängen am **Steckplatz** (Dosierer 4, Steckdose 7 …), nicht am Nam
 in GHL Connect ein Name geändert, z. B. Dosierer 4 „Kalium“ → „Magnesium“:
 
 - Name in HA ändert sich mit, Entitäts-ID, Verlauf und Dashboard bleiben
-- Die Einstellungen (z. B. „Warnen unter 500 ml“) bleiben – der Wächter **meldet die
-  Änderung per Telegram** („Belegung geändert: Kalium → Magnesium – Überwachung
+- Die Einstellungen (z. B. „Nachfüllen melden unter 500 ml“) bleiben – der Wächter **meldet die
+  Änderung per Telegram** („Belegung geändert: Dosierer 4: Kalium → Magnesium – Überwachung
   bleibt an, bitte prüfen“)
 - Eine laufende Störung zu diesem Steckplatz wird zurückgesetzt
 

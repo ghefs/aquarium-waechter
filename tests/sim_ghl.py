@@ -15,6 +15,8 @@ PROFILE = {
         "levels": {},
         "dosers": {0: ("Calcium", 800.0), 1: ("", 0.0)},
         "kh": None,
+        "lights": {0: ("Weiß", 60.0)},
+        "fw752": False,  # alte Firmware: DATARECORD nur Zeit
     },
     # 4 Leisten, viele Dosierer, Meerwasser-Sensorik, KH-Director
     "gross": {
@@ -24,6 +26,9 @@ PROFILE = {
         "levels": {0: ("Nachfüllung", 1), 1: ("", 0)},
         "dosers": {i: (f"Dosierer {i + 1}", 100.0 * i) for i in range(12)},
         "kh": (8.1, 8.0),
+        "lights": {0: ("Weiß", 52.9), 1: ("", 0.0), 4: ("Rot", 10.0), 5: ("Blau", 70.0)},
+        "fw752": True,   # neue Firmware: DATARECORD mit Statusbits; Sensor 3 mit Sensorfehler
+        "ion": [420.0, 1350.0, 0.0, 0.0, 0.0],
     },
 }
 
@@ -43,16 +48,26 @@ def answer(cmd, p):
         d, v, soll = p["sensors"][i]
         if attr == "ACTVALUE":
             return num(v if u is None else {"1": 35.0, "2": 1.025}.get(u, v))
+        if attr == "DATARECORD":
+            t = int(time.time()) - 600
+            return f'ACK <"{t},{v},0,0,{512 if i == 3 else 0}">' if p.get("fw752") else num(t)
         return {"DESVALUE": num(soll), "DESCRIPTION": txt(d)}.get(attr, "NACK (-5)")
     if obj == "LEVELSENSOR" and i in p["levels"]:
         d, st = p["levels"][i]
         return {"ACTSTATE": num(st), "DESCRIPTION": txt(d)}.get(attr, "NACK (-5)")
     if obj == "DOSER" and i in p["dosers"]:
         d, ml = p["dosers"][i]
-        return {"DESCRIPTION": txt(d), "FILLLEVEL": num(ml)}.get(attr, "NACK (-5)")
+        return {"DESCRIPTION": txt(d), "FILLLEVEL": num(ml), "CAPACITY": num(1700.0)}.get(attr, "NACK (-5)")
+    if obj == "ILLUMINATION" and i < 16 and m[2] is not None:
+        d, v = p.get("lights", {}).get(i, ("", 0.0))
+        return {"DESCRIPTION": txt(d), "ACTBRIGHTNESS": num(v)}.get(attr, "NACK (-5)")
     if obj == "KHDIRECTOR" and p["kh"]:
+        t = int(time.time() - 3 * 3600)
+        rec = f'ACK <"{t},{p["kh"][0]},0,0,0">' if p.get("fw752") else num(t)
         return {"ACTVALUE": num(p["kh"][0]), "DESVALUE": num(p["kh"][1]),
-                "DATARECORD": num(time.time() - 3 * 3600)}.get(attr, "NACK (-5)")
+                "DATARECORD": rec}.get(attr, "NACK (-5)")
+    if obj == "IONDIRECTOR" and p.get("ion") and i < 5:
+        return {"ACTVALUE": num(p["ion"][i]), "DESVALUE": num(p["ion"][i])}.get(attr, "NACK (-5)")
     if obj == "SYSTEM":
         return "NACK (-4)"
     return "NACK (-101)"

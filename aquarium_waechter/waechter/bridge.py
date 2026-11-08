@@ -12,9 +12,9 @@ aus HA entfernt (leere Discovery-Nachricht).
 import datetime
 import logging
 
-from .ghl import SENSOR_ARTS
+from .ghl import CATEGORIES, CATEGORY_NAMES, SENSOR_ARTS
 from .mqtt import MqttError
-from .settings import LEVEL_MODES
+from .settings import LEVEL_MODES, rule
 
 log = logging.getLogger("waechter")
 
@@ -30,6 +30,8 @@ class Bridge:
         mqtt.on_message = self._on_message
         mqtt.on_connect = self._on_connect
         mqtt.subscribe(f"{prefix}/+/cfg/+/+/set")
+        mqtt.subscribe(f"{prefix}/+/bereich/+/set")
+        mqtt.subscribe(f"{prefix}/+/leisten/set")
         mqtt.subscribe(f"{prefix}/_waechter/+")
 
     # ------------------------------------------------------------ eingehend
@@ -46,6 +48,20 @@ class Bridge:
         parts = topic.split("/")
         if len(parts) == 3 and parts[1] == "_waechter" and parts[2] in self.commands:
             self.commands[parts[2]]()
+            return
+        if len(parts) == 4 and parts[2] == "leisten" and parts[3] == "set":
+            dev = self.devices.get(parts[1])
+            if dev:
+                value = dev.settings.set_leisten(payload)
+                self._pub(f"{self.prefix}/{dev.uid}/leisten", value, retain=True)
+                dev.leisten_changed()
+            return
+        if len(parts) == 5 and parts[2] == "bereich" and parts[4] == "set" and parts[3] in CATEGORIES:
+            dev = self.devices.get(parts[1])
+            if dev:
+                value = dev.settings.set_bereich(parts[3], payload)
+                self._pub(f"{self.prefix}/{dev.uid}/bereich/{parts[3]}", "ON" if value else "OFF", retain=True)
+                dev.bereich_changed()
             return
         if len(parts) != 6 or parts[2] != "cfg" or parts[5] != "set":
             return
@@ -85,6 +101,9 @@ class Bridge:
                     value = it.get("art")  # nur geschätzt -> Schätzung anzeigen
                 if value is not None:
                     self.publish_field(dev, it["key"], field, value)
+        for cat in CATEGORIES:
+            self._pub(f"{self.prefix}/{dev.uid}/bereich/{cat}", "ON" if dev.bereich(cat) else "OFF", retain=True)
+        self._pub(f"{self.prefix}/{dev.uid}/leisten", dev.leisten(), retain=True)
 
     # ------------------------------------------------------------ Discovery
     def announce_waechter(self):
@@ -128,18 +147,44 @@ class Bridge:
         def gone(component, suffix):
             self._remove(component, f"{uid}_{suffix}")
 
+        # Teile, die es nicht mehr gibt (Bereich abgeschaltet, Steckplatz geleert) -> aus HA entfernen
+        known = dev.settings.store.data.setdefault("entitaeten", {}).setdefault(uid, {})
+        current = {it["key"] for it in dev.items}
+        for key in [k for k in known if k not in current]:
+            for comp, suffix in known.pop(key):
+                gone(comp, suffix)
+            log.info("%s: %s entfernt (nicht mehr vorhanden)", uid, key)
+        for it in dev.items:
+            k = it["key"]
+            known[k] = ([("switch", f"cfg_{k}_aktiv"), ("binary_sensor", f"mon_{k}")]
+                        + [(c, sfx) for c, sfx, _ in self._measurements(it, uid)]
+                        + [(c, sfx) for c, sfx, _ in self._config_entities(it, uid)])
+        dev.settings.store.save()
+
+        for cat in CATEGORIES:
+            ent("switch", f"bereich_{cat}", {
+                "name": f"Bereich {CATEGORY_NAMES[cat]} auslesen", "payload_on": "ON", "payload_off": "OFF",
+                "state_on": "ON", "state_off": "OFF", "icon": "mdi:format-list-checks", "entity_category": "config",
+                "state_topic": f"{base}/bereich/{cat}", "command_topic": f"{base}/bereich/{cat}/set"},
+                f"switch.{uid}_bereich_{cat}", live=False)
+
+        ent("text", "steckdosenleisten", {
+            "name": "Steckdosenleisten", "icon": "mdi:power-socket-eu", "entity_category": "config",
+            "max": 120, "state_topic": f"{base}/leisten", "command_topic": f"{base}/leisten/set"},
+            f"text.{uid}_steckdosenleisten", live=False)
+
         ent("binary_sensor", "ghl_connected", {
             "name": "Verbindung", "device_class": "connectivity", "entity_category": "diagnostic",
             "state_topic": f"{base}/connected"}, f"binary_sensor.{uid}_verbindung", live=False)
 
         for it in dev.items:
-            key, kind, name = it["key"], it["kind"], it["name"]
+            key, kind, name = it["key"], it["kind"], it["label"]
             s = dev.settings.get(key)
             cfg_t = lambda f: {"state_topic": f"{base}/cfg/{key}/{f}",
                                "command_topic": f"{base}/cfg/{key}/{f}/set", "entity_category": "config"}
             # Schalter "Abfragen" gibt es immer
             ent("switch", f"cfg_{key}_aktiv", {
-                "name": f"{name} abfragen", "payload_on": "ON", "payload_off": "OFF",
+                "name": f"{name} – auslesen", "payload_on": "ON", "payload_off": "OFF",
                 "state_on": "ON", "state_off": "OFF", "icon": "mdi:eye", **cfg_t("aktiv")},
                 f"switch.{uid}_{key}_abfragen", live=False)
 
@@ -155,10 +200,19 @@ class Bridge:
             for comp, suffix, conf in measure:
                 conf = {**conf, "state_topic": st}
                 ent(comp, suffix, conf, f"{comp}.{uid}_{suffix}")
+            if kind == "light":
+                gone("binary_sensor", f"mon_{key}")
+                continue
             ent("binary_sensor", f"mon_{key}", {
-                "name": f"{name} Störung", "device_class": "problem",
+                "name": f"{name} – Störung", "device_class": "problem",
                 "state_topic": f"{base}/mon/{key}", "json_attributes_topic": f"{base}/mon/{key}/attr"},
                 f"binary_sensor.{uid}_{key}_stoerung")
+            if kind in ("age", "doser"):
+                gone("number", f"cfg_{key}_delay")  # gab es bis 4.0.x
+            if kind == "switch" and not it.get("current"):
+                for suffix in ("enabled", "min", "max", "delay"):
+                    gone("switch" if suffix == "enabled" else "number", f"cfg_{key}_{suffix}")
+                gone("sensor", f"{key}_current")
             for comp, suffix, conf in cfgs:
                 field = suffix.rsplit("_", 1)[1]
                 ent(comp, suffix, {**conf, **cfg_t(field)},
@@ -173,7 +227,7 @@ class Bridge:
     @staticmethod
     def _measurements(it, uid):
         """-> [(component, suffix, conf)] ohne state_topic."""
-        key, kind, name = it["key"], it["kind"], it["name"]
+        key, kind, name = it["key"], it["kind"], it["label"]
 
         def tpl(k):
             return f"{{{{ value_json.{k} if value_json.{k} is defined else none }}}}"
@@ -184,7 +238,7 @@ class Bridge:
                 "payload_on": "ON", "payload_off": "OFF"})]
             if it["current"]:
                 out.append(("sensor", f"{key}_current", {
-                    "name": f"{name} Strom", "device_class": "current", "unit_of_measurement": "A",
+                    "name": f"{name} – Strom", "device_class": "current", "unit_of_measurement": "A",
                     "state_class": "measurement", "suggested_display_precision": 3,
                     "value_template": tpl(f"{key}_current")}))
             return out
@@ -199,50 +253,80 @@ class Bridge:
             out = [("sensor", key, {"name": name, "value_template": tpl(key), **base})]
             if it.get("main") or key == "kh":
                 out.append(("sensor", f"{key}_soll", {
-                    "name": f"{name} Sollwert", "entity_category": "diagnostic",
+                    "name": f"{name} – Sollwert", "entity_category": "diagnostic",
                     "value_template": tpl(f"{key}_soll"),
                     **{k: v for k, v in base.items() if k != "state_class"}}))
             return out
         if kind == "level":
             return [("sensor", key, {"name": name, "value_template": tpl(key), "icon": "mdi:waves-arrow-up"})]
         if kind == "doser":
-            return [("sensor", key, {
-                "name": f"{name} Füllstand", "device_class": "volume_storage", "unit_of_measurement": "mL",
+            out = [("sensor", key, {
+                "name": f"{name} – Füllstand", "device_class": "volume_storage", "unit_of_measurement": "mL",
                 "state_class": "measurement", "suggested_display_precision": 0, "icon": "mdi:cup-water",
                 "value_template": tpl(key)})]
+            if it.get("capacity"):
+                out.append(("sensor", f"{key}_pct", {
+                    "name": f"{name} – Füllstand %", "unit_of_measurement": "%", "state_class": "measurement",
+                    "suggested_display_precision": 0, "icon": "mdi:cup-water",
+                    "value_template": tpl(f"{key}_pct")}))
+            return out
+        if kind == "light":
+            return [("sensor", key, {"name": name, "unit_of_measurement": "%", "state_class": "measurement",
+                                     "suggested_display_precision": 0, "icon": "mdi:lightbulb-on-outline",
+                                     "value_template": tpl(key)})]
         if kind == "age":
-            return [("sensor", "kh_last", {"name": "KH letzte Messung", "device_class": "timestamp",
+            return [("sensor", "kh_last", {"name": name, "device_class": "timestamp",
                                            "value_template": tpl("kh_last_iso")})]
         return []
 
-    @staticmethod
-    def _config_entities(it, uid):
-        key, kind, name, unit = it["key"], it["kind"], it["name"], it.get("unit") or ""
+    # Wortlaut der Einstellungen – so steht es in HA und im Dashboard
+    LABELS = {
+        "enabled": "Alarm per Telegram",
+        ("switch", "min"): "Alarm, wenn AN und Strom unter",
+        ("switch", "max"): "Alarm, wenn Strom über (0 = aus)",
+        ("value", "min"): "Alarm, wenn Wert unter",
+        ("value", "max"): "Alarm, wenn Wert über",
+        ("doser", "min"): "Nachfüllen melden unter",
+        ("age", "max"): "Alarm, wenn keine Messung seit",
+        "delay": "Alarm erst nach (Dauer)",
+        "mode": "Alarm, wenn Sensor meldet",
+        "art": "Sensor-Art (für Einheit)",
+    }
 
-        def num(label, lo, hi, step, u, field):
+    @classmethod
+    def label_of(cls, kind, field):
+        return cls.LABELS.get((kind, field)) or cls.LABELS.get(field)
+
+    @classmethod
+    def _config_entities(cls, it, uid):
+        key, kind, name, unit = it["key"], it["kind"], it["label"], it.get("unit") or ""
+        if kind == "light" or (kind == "switch" and not it.get("current")):
+            return []
+
+        def num(lo, hi, step, u, field):
             return ("number", f"cfg_{key}_{field}", {
-                "name": f"{name} {label}", "min": lo, "max": hi, "step": step, "mode": "box",
-                **({"unit_of_measurement": u} if u else {})})
+                "name": f"{name} – {cls.label_of(kind, field)}", "min": lo, "max": hi, "step": step,
+                "mode": "box", **({"unit_of_measurement": u} if u else {})})
 
         out = []
         if kind == "level":
-            out.append(("select", f"cfg_{key}_mode", {"name": f"{name} Alarm", "options": LEVEL_MODES}))
+            out.append(("select", f"cfg_{key}_mode", {"name": f"{name} – {cls.label_of(kind, 'mode')}",
+                                                      "options": LEVEL_MODES}))
         else:
-            if kind != "switch" or it.get("current"):
-                out.append(("switch", f"cfg_{key}_enabled", {
-                    "name": f"{name} überwachen", "payload_on": "ON", "payload_off": "OFF",
-                    "state_on": "ON", "state_off": "OFF"}))
+            out.append(("switch", f"cfg_{key}_enabled", {
+                "name": f"{name} – {cls.label_of(kind, 'enabled')}", "payload_on": "ON", "payload_off": "OFF",
+                "state_on": "ON", "state_off": "OFF", "icon": "mdi:bell-ring-outline"}))
             lo, hi, step = {"switch": (0, 20, 0.01), "doser": (0, 100000, 10),
                             "age": (0.5, 168, 0.5)}.get(kind, (-1000, 10000, 0.001))
-            if kind in ("switch", "value", "doser") and (kind != "switch" or it.get("current")):
-                out.append(num("Warnen unter" if kind == "doser" else "Minimum", lo, hi, step, unit, "min"))
-            if kind in ("switch", "value", "age") and (kind != "switch" or it.get("current")):
-                label = {"switch": "Maximum (0 = aus)", "age": "Alarm wenn älter als"}.get(kind, "Maximum")
-                out.append(num(label, lo, hi, step, unit, "max"))
-        if kind != "switch" or it.get("current"):
-            out.append(num("Verzögerung", 0, 1440, 1, "min", "delay"))
+            if kind in ("switch", "value", "doser"):
+                out.append(num(lo, hi, step, unit, "min"))
+            if kind in ("switch", "value", "age"):
+                out.append(num(lo, hi, step, unit, "max"))
+        if kind not in ("age", "doser"):
+            out.append(num(0, 1440, 1, "min", "delay"))
         if kind == "value" and it.get("main"):
-            out.append(("select", f"cfg_{key}_art", {"name": f"{name} Art", "options": list(SENSOR_ARTS),
+            out.append(("select", f"cfg_{key}_art", {"name": f"{name} – {cls.label_of(kind, 'art')}",
+                                                     "options": list(SENSOR_ARTS),
                                                      "icon": "mdi:format-list-bulleted-type"}))
         return out
 
@@ -256,7 +340,9 @@ class Bridge:
     def connected(self, dev, ok):
         self._pub(f"{self.prefix}/{dev.uid}/connected", "ON" if ok else "OFF", retain=True)
 
-    def monitor(self, dev, key, fault, watched, detail):
-        base = f"{self.prefix}/{dev.uid}/mon/{key}"
+    def monitor(self, dev, it, fault, watched, detail):
+        base = f"{self.prefix}/{dev.uid}/mon/{it['key']}"
         self._pub(base, "ON" if fault else "OFF", retain=True)
-        self._pub(f"{base}/attr", {"detail": detail, "ueberwacht": watched}, retain=True)
+        self._pub(f"{base}/attr", {"detail": detail, "ueberwacht": watched,
+                                   "regel": rule(it, dev.settings.get(it["key"])),
+                                   "bezeichnung": it["label"]}, retain=True)

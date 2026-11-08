@@ -52,7 +52,7 @@ actions:
           {%- if bad | count == 0 -%}
             {%- set ns.out = ns.out ~ '✅ Alles OK (' ~ watched | count ~ ' Punkte überwacht)\n' -%}
           {%- else -%}
-            {%- for b in bad -%}{%- set ns.out = ns.out ~ '🔴 ' ~ short(b) | replace(' Störung','') ~ ': ' ~ b.attributes.detail ~ '\n' -%}{%- endfor -%}
+            {%- for b in bad -%}{%- set ns.out = ns.out ~ '🔴 ' ~ short(b) | replace(' – Störung','') | replace(' Störung','') ~ ': ' ~ b.attributes.detail ~ '\n' -%}{%- endfor -%}
           {%- endif -%}
           {%- for s in werte | sort(attribute='name') -%}
             {%- set ns.out = ns.out ~ '• ' ~ short(s) ~ ': ' ~ val(s) ~ '\n' -%}
@@ -77,7 +77,7 @@ actions:
           {%- set ns.out = ns.out ~ '(🟢 an · ⚫ aus)\n' -%}
         {%- elif cmd == '/dosierer' -%}
           {%- for s in sensors | selectattr('entity_id','search','_doser_\\d+$') | sort(attribute='name') -%}
-            {%- set ns.out = ns.out ~ '• ' ~ short(s) | replace(' Füllstand','') ~ ': ' ~ (s.state | float(0) | round(0) | int) ~ ' ml\n' -%}
+            {%- set ns.out = ns.out ~ '• ' ~ short(s) | replace(' – Füllstand','') | replace(' Füllstand','') ~ ': ' ~ (s.state | float(0) | round(0) | int) ~ ' ml\n' -%}
           {%- endfor -%}
         {%- endif -%} {%- endfor -%} {{ ns.out | trim if ns.out else 'Keine ProfiLux-Daten gefunden.' }} {%- endif -%}
   - action: notify.send_message

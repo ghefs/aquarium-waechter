@@ -2,10 +2,12 @@ configuration:
   geraete:
     name: ProfiLux-Geräte
     description: >-
-      Pro ProfiLux: name, host (IP) und optional, welche Bereiche gelesen werden
-      (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director – Standard: alle an).
-      unbenannte_abfragen: auch Steckdosen/Dosierer ohne Namen abfragen.
-      Einzelne Teile schaltet man danach in HA mit „… abfragen“ an/aus.
+      Pro ProfiLux: name und host (IP). Alles Weitere bequemer in HA auf der
+      Einstellungsseite des Dashboards. Optional als Vorgabe: steckdosenleisten
+      (z. B. „Alt=4 (ohne Strom), PAB=6“).
+      Bereiche (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, licht)
+      lassen sich bequemer in HA auf der Einstellungsseite an-/ausschalten.
+      unbenannte_abfragen: auch Teile ohne Namen auslesen.
   telegram_chat_id:
     name: Telegram-Chat-ID
     description: Gruppe/Chat für Alarme (mehrere mit Komma). Leer = nur Log.

@@ -13,6 +13,8 @@ import json
 import logging
 from pathlib import Path
 
+from .bridge import Bridge
+from .ghl import CATEGORY_NAMES
 from .haws import HaError
 
 log = logging.getLogger("waechter")
@@ -30,8 +32,44 @@ def _md_faults(uid):
             f"{{% for s in states.binary_sensor if s.entity_id.startswith('binary_sensor.{uid}_') "
             "and s.entity_id.endswith('_stoerung') and s.attributes.get('ueberwacht') %}"
             "{% if s.state == 'on' %}{% set ns.n = ns.n + 1 %}"
-            "🔴 **{{ s.name | replace(' Störung','') }}**: {{ s.attributes.detail }}\n\n{% endif %}{% endfor %}"
+            "🔴 **{{ s.attributes.bezeichnung or s.name }}**: {{ s.attributes.detail }}\n\n{% endif %}{% endfor %}"
             "{% if ns.n == 0 %}✅ Keine Störung{% endif %}")
+
+
+def _md_watched(uid):
+    """Liste aller überwachten Punkte: Regel im Klartext + aktueller Zustand."""
+    return ("{% set ns = namespace(n=0) %}"
+            f"{{% for s in states.binary_sensor if s.entity_id.startswith('binary_sensor.{uid}_') "
+            "and s.entity_id.endswith('_stoerung') and s.attributes.get('ueberwacht') %}"
+            "{% set ns.n = ns.n + 1 %}"
+            "{{ '🔴' if s.state == 'on' else '🟢' }} **{{ s.attributes.bezeichnung or s.name }}** – "
+            "jetzt: {{ s.attributes.detail }}  \n<small>{{ s.attributes.regel }}</small>\n\n{% endfor %}"
+            "{% if ns.n == 0 %}Noch nichts überwacht – auf der Einstellungsseite „Alarm per Telegram“ "
+            "einschalten.{% endif %}")
+
+
+HELP = (
+    "**So funktionieren die Einstellungen**\n\n"
+    "- **Auslesen** – der Wert wird vom ProfiLux gelesen und in Home Assistant angezeigt.\n"
+    "- **Alarm per Telegram** – nur wenn an, kommt bei einer Grenzverletzung eine Meldung.\n"
+    "- **Alarm, wenn …** – die Grenzen. Die Zeile *So wird überwacht* fasst sie in einem Satz zusammen.\n"
+    "- **Alarm erst nach (Dauer)** – kurze Ausreißer werden ignoriert; der Alarm kommt erst, "
+    "wenn die Störung so lange anhält.\n"
+    "- **Bereiche** – ganze Gruppen (z. B. Licht) gar nicht erst lesen.\n\n"
+    "Kürzel vorne im Namen: *Steckdose 2.3* = Leiste 2, Dose 3 · *Dosierer 4* · *Niveau 1* · "
+    "*pH*, *Temperatur* … = Sensor-Art.")
+
+
+def _strips(switches):
+    """Steckdosen nach Leiste gruppieren -> [(Titel, [items])]."""
+    groups = {}
+    for it in switches:
+        groups.setdefault(it.get("strip") or "", []).append(it)
+    out = []
+    for n, (strip, its) in enumerate(groups.items()):
+        title = "Steckdosen" if not strip else f"Leiste {its[0]['label'].split()[1].split('.')[0]} – {strip}"
+        out.append((title, its))
+    return out
 
 
 def build(workers):
@@ -44,7 +82,7 @@ def build(workers):
         values = [it for it in items if it["kind"] == "value"]
         if values:
             cards.append({"type": "grid", "columns": 2, "square": False, "cards": [
-                {"type": "tile", "entity": e("sensor", it["key"]), "name": it["name"]} for it in values]})
+                {"type": "tile", "entity": e("sensor", it["key"]), "name": it["label"]} for it in values]})
         # Verläufe: je Einheit ein Diagramm (beide pH-Sonden zusammen, Leitwert getrennt
         # von Salinität ...). KH misst nur alle paar Stunden -> 7 Tage.
         groups = {}
@@ -52,54 +90,76 @@ def build(workers):
             label = {"temperature": "Temperatur", "ph": "pH"}.get(it.get("device_class")) \
                 or ("KH" if it["key"] == "kh" else None) \
                 or {"mS/cm": "Leitwert", "µS/cm": "Leitwert", "PSU": "Salinität", "mV": "Redox",
-                    "mg/l": "Sauerstoff"}.get(it.get("unit")) or it["name"]
+                    "mg/l": "Sauerstoff"}.get(it.get("unit")) \
+                or (it["label"] if it["key"].startswith("ion_") else it["label"].split(" · ")[0])
             groups.setdefault(label, []).append(it)
         for label, its in groups.items():
             hours = 168 if label == "KH" else 48
             cards.append({"type": "history-graph", "title": f"{label} – {hours // 24} Tage" if hours > 24 else label,
                           "hours_to_show": hours,
                           "entities": [{"entity": e("sensor", it["key"]), "name": it["name"]} for it in its]})
-        switches = [it for it in items if it["kind"] == "switch"]
-        if switches:
-            cards.append({"type": "entities", "title": "Steckdosen", "entities": [
+        for title, its in _strips([it for it in items if it["kind"] == "switch"]):
+            cards.append({"type": "entities", "title": title, "state_color": True, "entities": [
                 {"entity": e("sensor", f"{it['key']}_current") if it["current"]
-                 else e("binary_sensor", f"{it['key']}_state"), "name": it["name"]}
-                for it in switches]})
+                 else e("binary_sensor", f"{it['key']}_state"), "name": it["label"]}
+                for it in its]})
         dosers = [it for it in items if it["kind"] == "doser"]
         if dosers:
-            cards.append({"type": "entities", "title": "Dosierbehälter",
-                          "entities": [{"entity": e("sensor", it["key"]), "name": it["name"]} for it in dosers]})
-            cards.append({"type": "history-graph", "title": "Füllstände – 14 Tage", "hours_to_show": 336,
-                          "entities": [{"entity": e("sensor", it["key"]), "name": it["name"]} for it in dosers]})
+            rows = []
+            for it in dosers:
+                rows.append({"entity": e("sensor", it["key"]), "name": it["label"]})
+            cards.append({"type": "entities", "title": "Dosierbehälter", "entities": rows})
+            pct = [it for it in dosers if it.get("capacity")]
+            cards.append({"type": "history-graph", "hours_to_show": 336,
+                          "title": "Füllstände in % – 14 Tage" if pct else "Füllstände – 14 Tage",
+                          "entities": [{"entity": e("sensor", f"{it['key']}_pct" if pct else it["key"]),
+                                        "name": it["name"]} for it in (pct or dosers)]})
         levels = [it for it in items if it["kind"] == "level"]
         if levels:
             cards.append({"type": "entities", "title": "Niveau",
-                          "entities": [{"entity": e("sensor", it["key"]), "name": it["name"]} for it in levels]})
+                          "entities": [{"entity": e("sensor", it["key"]), "name": it["label"]} for it in levels]})
+        lights = [it for it in items if it["kind"] == "light"]
+        if lights:
+            cards.append({"type": "history-graph", "title": "Licht – Helligkeit", "hours_to_show": 24,
+                          "entities": [{"entity": e("sensor", it["key"]), "name": it["label"]} for it in lights]})
+        cards.append({"type": "markdown", "title": "So wird überwacht", "content": _md_watched(uid)})
         views.append({"title": dev.name, "path": uid, "icon": "mdi:fishbowl", "cards": cards})
 
-        # Einstellungen: alle gefundenen Teile, Abfragen-Schalter immer sichtbar
-        groups = {"switch": "Steckdosen", "value": "Messwerte", "level": "Niveau", "doser": "Dosierer",
-                  "age": "KH-Messung"}
-        sections = []
-        for kind, title in groups.items():
+        # Einstellungen: alle gefundenen Teile, "Auslesen" immer sichtbar
+        sections = [{"type": "grid", "cards": [
+            {"type": "heading", "heading": "Kurz erklärt"},
+            {"type": "markdown", "content": HELP},
+            {"type": "heading", "heading": "Steckdosenleisten", "heading_style": "subtitle"},
+            {"type": "markdown", "content": (
+                "Steckdosen in der Reihenfolge der Kanäle auf Leisten aufteilen, z. B. "
+                "`Alt=4 (ohne Strom), PAB=6` → Kanal 1–4 = Leiste 1, 5–10 = Leiste 2. "
+                "*(ohne Strom)* = Leiste misst keinen Strom → kein Strom-Alarm. Leer = durchzählen.")},
+            {"type": "entities", "entities": [{"entity": e("text", "steckdosenleisten"), "name": "Aufteilung"}]},
+            {"type": "heading", "heading": "Bereiche", "heading_style": "subtitle"},
+            {"type": "entities", "state_color": True, "entities": [
+                {"entity": e("switch", f"bereich_{cat}"), "name": name}
+                for cat, name in CATEGORY_NAMES.items()]}]}]
+        kinds = [("value", "Messwerte"), ("age", "KH-Director"), ("doser", "Dosierbehälter"),
+                 ("level", "Niveausensoren"), ("light", "Licht")]
+        blocks = [(t, its) for t, its in _strips([it for it in dev.items if it["kind"] == "switch"])]
+        blocks += [(t, [it for it in dev.items if it["kind"] == k]) for k, t in kinds]
+        for title, its in blocks:
             rows = []
-            for it in dev.items:
-                if it["kind"] != kind:
-                    continue
+            for it in its:
                 k = it["key"]
-                rows.append({"type": "section", "label": it["name"]})
-                rows.append({"entity": e("switch", f"{k}_abfragen"), "name": "Abfragen"})
-                if not dev.settings.get(k)["aktiv"]:
+                rows.append({"type": "section", "label": it["label"]})
+                rows.append({"entity": e("switch", f"{k}_abfragen"), "name": "Auslesen"})
+                if not dev.settings.get(k)["aktiv"] or it["kind"] == "light":
                     continue
-                for comp, suf, label in (("switch", "ueberwachen", "Überwachen"),
-                                         ("select", "alarm", "Alarm"), ("select", "art", "Art"),
-                                         ("number", "min", None), ("number", "max", None),
-                                         ("number", "verzoegerung", "Verzögerung")):
-                    if any(c == comp and s.endswith(f"_{suf}") for c, s, _ in dev.bridge_cfg(it)):
-                        row = {"entity": e(comp, f"{k}_{suf}")}
-                        if label:
-                            row["name"] = label
-                        rows.append(row)
+                rows.append({"type": "attribute", "entity": e("binary_sensor", f"{k}_stoerung"),
+                             "attribute": "regel", "name": "So wird überwacht"})
+                cfg = dev.bridge_cfg(it)
+                for comp, suf, field in (("switch", "ueberwachen", "enabled"), ("select", "alarm", "mode"),
+                                         ("number", "min", "min"), ("number", "max", "max"),
+                                         ("number", "verzoegerung", "delay"), ("select", "art", "art")):
+                    if any(c == comp and s.endswith(f"_{field}") for c, s, _ in cfg):
+                        rows.append({"entity": e(comp, f"{k}_{suf}"),
+                                     "name": Bridge.label_of(it["kind"], field)})
             if rows:
                 sections.append({"type": "grid", "cards": [
                     {"type": "heading", "heading": title},
@@ -112,7 +172,8 @@ def build(workers):
                 "für eigene Anpassungen das Dashboard besser kopieren. "
                 "Mit dem Knopf unten wird es neu erzeugt (Handänderungen gehen verloren).")},
             {"type": "entities", "entities": ["button.aquarium_waechter_dashboard_neu",
-                                              "button.aquarium_waechter_telegram_test"]}]})
+                                              "button.aquarium_waechter_telegram_test",
+                                              "button.aquarium_waechter_neu_einlesen"]}]})
         views.append({"title": f"{dev.name} – Einstellungen", "path": f"{uid}-einstellungen",
                       "icon": "mdi:tune", "type": "sections", "max_columns": 4, "sections": sections})
     return {"title": TITLE, "views": views}
