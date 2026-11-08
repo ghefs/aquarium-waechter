@@ -1,6 +1,9 @@
 # Aquarium-Wächter – GHL ProfiLux 4 in Home Assistant
 
+**🇩🇪 Deutsch** · [🇬🇧 English](README.en.md)
+
 ### 🐠 Bring dein Aquarium auf das nächste Level.
+*Take your aquarium to the next level.*
 
 Alle Werte in Home Assistant, Überwachung von Pumpen, Sonden, KH-Director und
 Dosierern – und ein **Alarm aufs Handy, der auch nachts im Stumm-Modus klingelt**,
@@ -12,9 +15,11 @@ bevor aus einer ausgefallenen Pumpe ein Notfall wird.
 >
 > <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
 
-> 🇬🇧 *Take your aquarium to the next level: Home Assistant add-on that monitors GHL ProfiLux 4
-> aquarium controllers and sends critical push (HA app) or Telegram alarms when a pump stops, a probe fails, the KH Director stops measuring or a
-> dosing container runs low. Documentation is in German – the add-on works worldwide.*
+> 🇬🇧 **English:** Home Assistant add-on for **GHL ProfiLux 4** aquarium controllers – all
+> values in HA, monitoring of pumps, probes, KH Director and dosers, and **critical push
+> alarms** (HA app, rings in silent mode) or Telegram when a pump stops, a probe fails,
+> the KH Director stops measuring or a dosing container runs low.
+> **→ [Full English README](README.en.md)**
 
 Home-Assistant-Add-on, das einen oder mehrere Aquariencomputer **GHL ProfiLux 4**
 (Meer- und Süßwasser) über die lokale GHL-API überwacht – mit Alarm aufs Handy (HA-App und/oder Telegram):
@@ -168,7 +173,8 @@ Rechtlich maßgeblich ist die [MIT-Lizenz](LICENSE) („THE SOFTWARE IS PROVIDED
 
 GHL ProfiLux 4, ProfiLux 3, GHL Connect, Aquariencomputer, Aquarium Controller,
 Riffaquarium, Meerwasseraquarium, KH Director, Doser, Dosierpumpe, Home Assistant
-Add-on, MQTT, Telegram, Pumpenüberwachung, Aquarium Alarm
+Add-on, MQTT, Telegram, Pumpenüberwachung, Aquarium Alarm, aquarium controller, reef tank,
+saltwater aquarium, dosing pump, pump monitoring, critical notification
 
 ## Lizenz
 
