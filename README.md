@@ -167,6 +167,8 @@ Jetzt auf der Einstellungsseite festlegen, was überwacht wird
 Neue Versionen erscheinen in Home Assistant wie bei jedem Add-on unter
 *Einstellungen* (Update-Hinweis) → **Aktualisieren**. Einstellungen bleiben erhalten.
 Beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen.
+Was sich geändert hat, steht im [Änderungsprotokoll](aquarium_waechter/CHANGELOG.md)
+(in HA beim Add-on im Reiter „Änderungsprotokoll“).
 
 ### Deinstallieren
 
