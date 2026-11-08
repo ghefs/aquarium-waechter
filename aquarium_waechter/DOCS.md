@@ -16,7 +16,7 @@ Beispiele für eigene Automationen.
 
 ## ☕ Unterstützen
 
-Der Wächter ist kostenlos – und soll es bleiben. Wenn er dir eine schlaflose Nacht oder
+Dieses Add-on ist kostenlos – und soll es bleiben. Wenn es dir eine schlaflose Nacht oder
 sogar ein Becken erspart, spendier mir einen Kaffee:
 
 <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>

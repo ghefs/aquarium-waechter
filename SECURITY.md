@@ -15,9 +15,9 @@ Hilfreich sind: betroffene Version, Beschreibung, Schritte zum Nachvollziehen un
 möglichen Folgen. Ich melde mich in der Regel innerhalb weniger Tage. Nach der Korrektur
 wird die Lücke im Änderungsprotokoll genannt – auf Wunsch mit Dank an den Finder.
 
-## Wie der Wächter mit Daten umgeht
+## Wie das Add-on mit Daten umgeht
 
-- Der ProfiLux wird nur **gelesen** (GHL-API, TCP 10002, lokal im Heimnetz); der Wächter
+- Der ProfiLux wird nur **gelesen** (GHL-API, TCP 10002, lokal im Heimnetz); das Add-on
   schaltet und ändert dort nichts.
 - Der Telegram-Token wird aus der Telegram-Integration von Home Assistant gelesen und
   nirgends gespeichert oder protokolliert. Nachrichten gehen nur an `api.telegram.org`.

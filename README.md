@@ -5,11 +5,12 @@
 ### 🐠 Bring dein Aquarium auf das nächste Level.
 *Take your aquarium to the next level.*
 
-Alle Werte in Home Assistant, Überwachung von Pumpen, Sonden, KH-Director und
-Dosierern – und ein **Alarm aufs Handy, der auch nachts im Stumm-Modus klingelt**,
+**Verbindet GHL ProfiLux 4 in wenigen Minuten mit Home Assistant** – ohne YAML und ohne
+eigene Sensoren: alle Werte automatisch in HA, Überwachung von Pumpen, Sonden,
+KH-Director und Dosierern – und ein **Alarm aufs Handy, der auch nachts im Stumm-Modus klingelt**,
 bevor aus einer ausgefallenen Pumpe ein Notfall wird.
 
-> ☕ **Der Wächter ist kostenlos – und soll es bleiben.** Wenn er dir eine schlaflose
+> ☕ **Dieses Add-on ist kostenlos – und soll es bleiben.** Wenn es dir eine schlaflose
 > Nacht oder sogar ein Becken erspart, spendier mir einen Kaffee. Das hält das Projekt
 > am Leben und finanziert neue Funktionen.
 >
@@ -45,7 +46,7 @@ wenn Home Assistant selbst gerade hängt. Wer ganz sicher gehen will, nutzt beid
 
 Weil am Wochenende unbemerkt eine Pumpe ausgefallen ist. Der Aquariencomputer regelt
 zuverlässig – aber er sagt einem nicht unbedingt, **dass ein Gerät gar nicht läuft**.
-Genau diese Lücke schließt der Wächter:
+Genau diese Lücke schließt der Aquarium-Wächter:
 
 - **Ausgänge wirklich überwachen:** Steckdose ist AN, aber die Pumpe zieht keinen
   Strom? → Alarm. Strom plötzlich zu hoch (blockierte Pumpe)? → Alarm.
@@ -64,7 +65,7 @@ Genau diese Lücke schließt der Wächter:
 > Ausgänge werden nur gelesen, niemals geschaltet.
 
 > ⚠️ **Nutzung auf eigene Gefahr – siehe [Haftungsausschluss](#haftungsausschluss).**
-> Der Wächter ist eine zusätzliche Überwachung und **kein Ersatz** für die
+> Das Add-on ist eine zusätzliche Überwachung und **kein Ersatz** für die
 > Schutzfunktionen des ProfiLux und unabhängige Sicherungen am Becken.
 
 **→ [Schnellstart](#schnellstart)** · 📖 [Wiki mit allen Details](https://github.com/ghefs/aquarium-waechter/wiki) · ☕ [Projekt unterstützen](#unterstützen)
@@ -139,8 +140,8 @@ Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
 
 ## Unterstützen
 
-Der Wächter ist kostenlos und bleibt es. Hinter jeder Version stecken viele Abende
-Entwicklung und Tests am echten Becken. Wenn er dir hilft – oder vielleicht sogar
+Das Add-on ist kostenlos und bleibt es. Hinter jeder Version stecken viele Abende
+Entwicklung und Tests am echten Becken. Wenn es dir hilft – oder vielleicht sogar
 ein Becken gerettet hat – freue ich mich über einen Kaffee:
 
 <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
@@ -160,7 +161,7 @@ Bitte beachten:
 - Eine Überwachung kann ausfallen: Stromausfall, WLAN/Netzwerk, Home Assistant,
   Telegram, Internet, Firmware-Updates des ProfiLux (GHL-API danach wieder aus) usw.
   Ausbleibende Meldungen bedeuten **nicht**, dass alles in Ordnung ist.
-- Der Wächter ersetzt **keine** Schutzeinrichtungen: Heizstab mit eigenem
+- Das Add-on ersetzt **keine** Schutzeinrichtungen: Heizstab mit eigenem
   Thermostat, Niveau-/Überlaufschutz, Fehlerstrom-Schutzschalter, Rauchmelder,
   regelmäßige Sichtkontrolle.
 - Grenzwerte und Einstellungen liegen in der Verantwortung des Nutzers.

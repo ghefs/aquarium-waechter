@@ -200,7 +200,7 @@ def build(workers):
                 "**Änderungen von Hand** werden erkannt und dann nicht mehr überschrieben – "
                 "für eigene Anpassungen das Dashboard besser kopieren. "
                 "Mit dem Knopf unten wird es neu erzeugt (Handänderungen gehen verloren).\n\n"
-                "☕ **Der Wächter ist kostenlos.** Gefällt er dir? "
+                "☕ **Dieses Add-on ist kostenlos.** Gefällt es dir? "
                 "[Spendier mir einen Kaffee](https://buymeacoffee.com/gutgeschaltet) · "
                 "[⭐ auf GitHub](https://github.com/ghefs/aquarium-waechter)")},
             {"type": "entities", "entities": ["button.aquarium_waechter_dashboard_neu",
@@ -212,7 +212,7 @@ def build(workers):
                 "Am Becken arbeiten (Pumpe reinigen, Sonde kalibrieren …)? **Wartung** einschalten – "
                 "dann kommen für die eingestellte Dauer **keine Alarme**. Danach schaltet sie sich "
                 "selbst ab; steht eine Störung dann noch an, wird sie gemeldet. "
-                "Der Wächter schaltet dabei am ProfiLux nichts.")},
+                "Das Add-on schaltet dabei am ProfiLux nichts.")},
             {"type": "entities", "state_color": True, "entities": [
                 "switch.aquarium_waechter_wartung", "number.aquarium_waechter_wartung_dauer"]}]})
         phones = workers[0].app.notifier.phones if workers else []

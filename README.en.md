@@ -4,8 +4,9 @@
 
 ### 🐠 Take your aquarium to the next level.
 
-All values in Home Assistant, monitoring of pumps, probes, KH Director and dosing
-pumps – and an **alarm on your phone that rings even at night in silent mode**,
+**Connects GHL ProfiLux 4 to Home Assistant in minutes** – no YAML, no hand-made
+sensors: all values automatically in HA, monitoring of pumps, probes, KH Director and
+dosing pumps – and an **alarm on your phone that rings even at night in silent mode**,
 before a failed pump turns into an emergency.
 
 > ☕ **The add-on is free – and will stay free.** If it saves you a sleepless night or
