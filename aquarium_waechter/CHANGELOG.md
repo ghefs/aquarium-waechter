@@ -3,6 +3,13 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## Blueprint Telegram-Befehle (ohne Add-on-Update)
+
+- Befehle heißen jetzt `/aq`, `/aq_werte`, `/aq_steckdosen`, `/aq_dosierer`,
+  `/aq_hilfe` (antippbar, keine Überschneidung mit anderen Automationen).
+  Wer den Blueprint schon nutzt: unter *Blueprints* → ⋮ → **Blueprint neu
+  importieren**, danach im BotFather-Menü die neuen Befehle eintragen.
+
 ## 4.0.4
 
 - Das Add-on wird jetzt fertig gebaut von GitHub geladen (ghcr.io) statt auf dem

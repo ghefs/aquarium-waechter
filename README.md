@@ -157,7 +157,7 @@ Jetzt auf der Einstellungsseite festlegen, was überwacht wird
 ### Schritt 6 – optional: Telegram-Befehle und Shelly
 
 [![Blueprint Telegram-Befehle importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fghefs%2Faquarium-waechter%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faquarium_waechter%2Ftelegram_befehle.yaml)
-&nbsp;Telegram-Befehle (`/status`, `/werte` …) – siehe [Werte per Befehl abfragen](#werte-per-befehl-abfragen-optional)
+&nbsp;Telegram-Befehle (`/aq`, `/aq_werte` …) – siehe [Werte per Befehl abfragen](#werte-per-befehl-abfragen-optional)
 
 [![Blueprint Shelly importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fghefs%2Faquarium-waechter%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faquarium_waechter%2Fshelly_geraet_ueberwachen.yaml)
 &nbsp;Geräte an Shelly-Steckdosen überwachen – siehe [Shelly](#optional-shelly-steckdosen)
@@ -262,21 +262,25 @@ Meldungen beginnen mit dem Gerätenamen, z. B. `🚨 Riff · STÖRUNG: Rückför
 
 ### Werte per Befehl abfragen (optional)
 
-In der Gruppe einfach einen Befehl schreiben – der Bot antwortet mit den aktuellen
-Werten aller ProfiLux:
+In der Gruppe einen Befehl schreiben oder antippen – der Bot antwortet mit den
+aktuellen Werten aller ProfiLux:
 
 | Befehl | Antwort |
 |---|---|
-| `/status` | Störungen und die wichtigsten Messwerte, Zeitpunkt der letzten KH-Messung |
-| `/werte` | alle Messwerte mit Sollwert, Niveau |
-| `/steckdosen` | alle Steckdosen: an/aus und Strom |
-| `/dosierer` | Füllstände aller Dosierbehälter |
-| `/hilfe` | Befehlsliste |
+| `/aq` | Störungen und die wichtigsten Messwerte, Zeitpunkt der letzten KH-Messung |
+| `/aq_werte` | alle Messwerte mit Sollwert, Niveau |
+| `/aq_steckdosen` | alle Steckdosen: an/aus und Strom |
+| `/aq_dosierer` | Füllstände aller Dosierbehälter |
+| `/aq_hilfe` | Befehlsliste |
 
-Beispiel `/status`:
+Die Befehle haben das Kürzel `aq_` (mit Unterstrich, denn Telegram macht nur Befehle
+ohne Leerzeichen antippbar). So bleiben Befehle wie `/status` oder `/hilfe` frei für
+andere Automationen in Home Assistant.
+
+Beispiel `/aq`:
 
 ```
-ℹ️ Status
+ℹ️ Status – Aquarium
 ━━ Riff ━━
 ✅ Alles OK (9 Punkte überwacht)
 • KH: 7.9 dKH
@@ -298,11 +302,11 @@ Einrichten:
    **@BotFather** → `/setcommands` → Bot wählen → senden:
 
    ```
-   status - Störungen und wichtigste Werte
-   werte - alle Messwerte mit Sollwerten
-   steckdosen - Steckdosen und Strom
-   dosierer - Füllstände der Dosierbehälter
-   hilfe - Befehlsliste
+   aq - Aquarium: Störungen und wichtigste Werte
+   aq_werte - Aquarium: alle Messwerte mit Soll
+   aq_steckdosen - Aquarium: Steckdosen und Strom
+   aq_dosierer - Aquarium: Füllstände der Dosierer
+   aq_hilfe - Aquarium: Befehlsliste
    ```
 
 Der Bot antwortet nur in Chats, die in der Telegram-Integration erlaubt sind.

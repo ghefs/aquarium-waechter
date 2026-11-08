@@ -3,8 +3,9 @@ blueprint:
   description: >-
     Beantwortet Befehle in der Telegram-Gruppe mit den aktuellen Werten aller
     ProfiLux-Geräte des Aquarium-Wächters (auch bei mehreren Geräten):
-    /status (Störungen + wichtigste Werte), /werte (alle Messwerte mit Sollwert),
-    /steckdosen (Zustand und Strom), /dosierer (Füllstände), /hilfe.
+    /aq (Störungen + wichtigste Werte), /aq_werte (alle Messwerte mit Sollwert),
+    /aq_steckdosen (Zustand und Strom), /aq_dosierer (Füllstände), /aq_hilfe.
+    Unterstrich statt Leerzeichen, damit Telegram die Befehle antippbar macht.
     Voraussetzung: Telegram-Bot-Integration mit der Gruppe als erlaubtem Chat.
   domain: automation
   source_url: https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/telegram_befehle.yaml
@@ -26,18 +27,20 @@ triggers:
 conditions:
   - condition: template
     value_template: >-
-      {{ (trigger.event.data.command | lower).split('@')[0] in
-         ['/status', '/werte', '/steckdosen', '/dosierer', '/hilfe', '/start', '/help'] }}
+      {% set c = (trigger.event.data.command | lower).split('@')[0] %} {{ c == '/aq' or c.startswith('/aq_') }}
 
 actions:
   - variables:
       ziel: !input ziel
-      cmd: "{{ (trigger.event.data.command | lower).split('@')[0] }}"
+      sub: >-
+        {% set c = (trigger.event.data.command | lower).split('@')[0] %} {{ c[4:] if c.startswith('/aq_') else 'status' }}
+      cmd: >-
+        {{ '/' ~ sub if sub in ['status', 'werte', 'steckdosen', 'dosierer'] else '/hilfe' }}
       text: >-
         {%- set ns = namespace(out='') -%} {%- set devs = states.binary_sensor | selectattr('entity_id','search','_verbindung$')
              | map(attribute='entity_id') | map('device_id') | reject('none') | unique
              | select('is_device_attr','manufacturer','GHL') | list -%}
-        {%- macro short(s) -%}{{ s.name | replace((device_attr(device_id(s.entity_id),'name') or '') ~ ' ','') }}{%- endmacro -%} {%- macro val(s) -%}{%- if s.state in ['unknown','unavailable'] -%}–{%- else -%}{{ s.state | float(0) | round(3 if s.state | float(0) | abs < 2 else 2) }} {{ s.attributes.get('unit_of_measurement', '') }}{%- endif -%}{%- endmacro -%} {%- if cmd in ['/hilfe', '/help', '/start'] -%} {{ 'Befehle:\n/status – Störungen + wichtigste Werte\n/werte – alle Messwerte mit Soll\n/steckdosen – Steckdosen und Strom\n/dosierer – Füllstände der Dosierbehälter' }} {%- else -%} {%- for d in devs -%} {%- set ents = device_entities(d) -%} {%- set dn = device_attr(d, 'name') -%} {%- set ns.out = ns.out ~ '\n━━ ' ~ dn ~ ' ━━\n' -%} {%- set sensors = states.sensor | selectattr('entity_id','in',ents) | list -%} {%- set werte = sensors | selectattr('entity_id','search','_(sensor_\\d+(_\\d+)?|flow_\\d+|kh)$') | list -%} {%- if cmd == '/status' -%}
+        {%- macro short(s) -%}{{ s.name | replace((device_attr(device_id(s.entity_id),'name') or '') ~ ' ','') }}{%- endmacro -%} {%- macro val(s) -%}{%- if s.state in ['unknown','unavailable'] -%}–{%- else -%}{{ s.state | float(0) | round(3 if s.state | float(0) | abs < 2 else 2) }} {{ s.attributes.get('unit_of_measurement', '') }}{%- endif -%}{%- endmacro -%} {%- if cmd in ['/hilfe', '/help', '/start'] -%} {{ 'Aquarium-Befehle:\n/aq – Störungen + wichtigste Werte\n/aq_werte – alle Messwerte mit Soll\n/aq_steckdosen – Steckdosen und Strom\n/aq_dosierer – Füllstände der Dosierbehälter' }} {%- else -%} {%- for d in devs -%} {%- set ents = device_entities(d) -%} {%- set dn = device_attr(d, 'name') -%} {%- set ns.out = ns.out ~ '\n━━ ' ~ dn ~ ' ━━\n' -%} {%- set sensors = states.sensor | selectattr('entity_id','in',ents) | list -%} {%- set werte = sensors | selectattr('entity_id','search','_(sensor_\\d+(_\\d+)?|flow_\\d+|kh)$') | list -%} {%- if cmd == '/status' -%}
           {%- set st = states.binary_sensor | selectattr('entity_id','in',ents)
                | selectattr('entity_id','search','_stoerung$') | list -%}
           {%- set watched = st | selectattr('attributes.ueberwacht','eq',true) | list -%}
@@ -81,5 +84,5 @@ actions:
     target:
       entity_id: "{{ ziel }}"
     data:
-      title: "ℹ️ {{ {'/status':'Status', '/werte':'Messwerte', '/steckdosen':'Steckdosen', '/dosierer':'Dosierbehälter'}.get(cmd, 'Hilfe') }}"
+      title: "ℹ️ {{ {'/status':'Status', '/werte':'Messwerte', '/steckdosen':'Steckdosen', '/dosierer':'Dosierbehälter'}.get(cmd, 'Hilfe') }} – Aquarium"
       message: "{{ text }}"
