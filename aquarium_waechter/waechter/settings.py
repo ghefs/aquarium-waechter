@@ -146,6 +146,16 @@ class SettingsStore:
         log.info("Einstellung %s/%s.%s: %s -> %s", dev_id, key, field, old, value)
         return value
 
+    # Push an die HA-App: je Handy an/aus (None = noch nie geschaltet -> Option app_push)
+    def push(self, phone):
+        return self.data.setdefault("push", {}).get(phone)
+
+    def set_push(self, phone, raw):
+        value = str(raw).strip().upper() in ("ON", "TRUE", "1")
+        self.data.setdefault("push", {})[phone] = value
+        self.save()
+        return value
+
     def save(self):
         with self.lock:
             tmp = self.path.with_suffix(".tmp")

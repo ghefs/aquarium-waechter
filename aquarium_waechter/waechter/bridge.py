@@ -12,6 +12,7 @@ aus HA entfernt (leere Discovery-Nachricht).
 import datetime
 import logging
 
+from .notify import phone_name
 from .ghl import CATEGORIES, CATEGORY_NAMES, MAX_STRIPS, NO_STRIP, SENSOR_ARTS, STRIP_TYPES
 from .mqtt import MqttError
 from .settings import LEVEL_MODES, rule
@@ -33,6 +34,9 @@ class Bridge:
         mqtt.subscribe(f"{prefix}/+/bereich/+/set")
         mqtt.subscribe(f"{prefix}/+/leiste/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/+")
+        mqtt.subscribe(f"{prefix}/_waechter/push/+/set")
+        self.notifier = None   # für die Schalter „Push an …“
+        self.on_push = None
 
     # ------------------------------------------------------------ eingehend
     def _on_connect(self):
@@ -48,6 +52,11 @@ class Bridge:
         parts = topic.split("/")
         if len(parts) == 3 and parts[1] == "_waechter" and parts[2] in self.commands:
             self.commands[parts[2]]()
+            return
+        if len(parts) == 5 and parts[1] == "_waechter" and parts[2] == "push" and parts[4] == "set":
+            if self.notifier and parts[3] in self.notifier.phones and self.on_push:
+                self.on_push(parts[3], payload)
+                self.publish_push()
             return
         if len(parts) == 5 and parts[2] == "leiste" and parts[4] == "set" and parts[3].isdigit():
             dev, n = self.devices.get(parts[1]), int(parts[3])
@@ -117,7 +126,7 @@ class Bridge:
                "manufacturer": "aquarium-waechter", "model": "Add-on"}
         for cmd, name, icon, eid in (("dashboard", "Dashboard neu erzeugen", "mdi:view-dashboard-edit",
                                       "button.aquarium_waechter_dashboard_neu"),
-                                     ("telegram_test", "Telegram-Test senden", "mdi:send",
+                                     ("telegram_test", "Test-Alarm senden", "mdi:send",
                                       "button.aquarium_waechter_telegram_test"),
                                      ("rescan", "Geräte neu einlesen", "mdi:refresh",
                                       "button.aquarium_waechter_neu_einlesen")):
@@ -132,7 +141,38 @@ class Bridge:
             "json_attributes_topic": f"{self.prefix}/_waechter/sammel/attr",
             "default_entity_id": "binary_sensor.aquarium_waechter_sammelstoerung",
             "availability_topic": self.avail, "device": dev})
+        known = set(self.store_known("push"))
+        if self.notifier:
+            for phone in self.notifier.phones:
+                self._conf("switch", f"aquarium_waechter_push_{phone}", {
+                    "unique_id": f"aquarium_waechter_push_{phone}",
+                    "name": f"Push an {phone_name(phone)}", "icon": "mdi:cellphone-message",
+                    "state_topic": f"{self.prefix}/_waechter/push/{phone}",
+                    "command_topic": f"{self.prefix}/_waechter/push/{phone}/set",
+                    "default_entity_id": f"switch.aquarium_waechter_push_{phone}",
+                    "availability_topic": self.avail, "device": dev})
+                known.discard(phone)
+            for gone in known:  # Handy aus HA entfernt -> Schalter weg
+                self._remove("switch", f"aquarium_waechter_push_{gone}")
+            self.store_known("push", self.notifier.phones)
+            self.publish_push()
         self._pub(self.avail, "online", retain=True)
+
+    def publish_push(self):
+        for phone in self.notifier.phones:
+            self._pub(f"{self.prefix}/_waechter/push/{phone}",
+                      "ON" if self.notifier.push_on(phone) else "OFF", retain=True)
+
+    def store_known(self, name, value=None):
+        """Bekannte Handys merken (zum Aufräumen alter Schalter)."""
+        st = self.notifier.store if self.notifier else None
+        if not st:
+            return []
+        if value is None:
+            return st.data.get("bekannt", {}).get(name, [])
+        st.data.setdefault("bekannt", {})[name] = list(value)
+        st.save()
+        return value
 
     def summary(self, uid, faults):
         """Sammelstörung: an, sobald eine überwachte Störung gemeldet ist. Für eigene

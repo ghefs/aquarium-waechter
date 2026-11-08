@@ -195,6 +195,17 @@ def build(workers):
             {"type": "entities", "entities": ["button.aquarium_waechter_dashboard_neu",
                                               "button.aquarium_waechter_telegram_test",
                                               "button.aquarium_waechter_neu_einlesen"]}]})
+        phones = workers[0].app.notifier.phones if workers else []
+        if phones:
+            sections.append({"type": "grid", "cards": [
+                {"type": "heading", "heading": "Alarm aufs Handy"},
+                {"type": "markdown", "content": (
+                    "Push an die **Home-Assistant-App**: hier je Handy einschalten. Störungen kommen "
+                    "als **kritische Benachrichtigung** (klingelt auch bei Stumm/Nicht stören – am "
+                    "iPhone einmal *Kritische Hinweise* erlauben). Neues Handy? → „Geräte neu einlesen“. "
+                    "Danach mit „Test-Alarm senden“ prüfen.")},
+                {"type": "entities", "state_color": True, "entities": [
+                    {"entity": f"switch.aquarium_waechter_push_{p}"} for p in phones]}]})
         views.append({"title": f"{dev.name} – Einstellungen", "path": f"{uid}-einstellungen",
                       "icon": "mdi:tune", "type": "sections", "max_columns": 4, "sections": sections})
     return {"title": TITLE, "views": views}

@@ -10,7 +10,14 @@ configuration:
       unbenannte_abfragen: auch Teile ohne Namen auslesen.
   telegram_chat_id:
     name: Telegram-Chat-ID
-    description: Wohin die Alarme gehen – Gruppe (beginnt mit -) oder Einzelchat (positive Zahl), mehrere mit Komma. Wie man die ID findet, steht in der Anleitung unter „Telegram“. Leer = nur Log.
+    description: Wohin die Alarme gehen – Gruppe (beginnt mit -) oder Einzelchat (positive Zahl), mehrere mit Komma. Wie man die ID findet, steht in der Anleitung unter „Telegram“. Leer = kein Telegram.
+  app_push:
+    name: Push an die Home-Assistant-App
+    description: >-
+      Nicht nötig – bequemer in HA auf der Einstellungsseite unter „Alarm aufs Handy“ je
+      Handy einschalten. Hier nur als Vorgabe: z. B. mobile_app_iphone_von_max, mehrere
+      mit Komma. Störungen kommen als kritische Benachrichtigung (klingelt auch bei
+      Stumm/Nicht stören).
   telegram_token:
     name: Telegram-Bot-Token
     description: Leer lassen, wenn die Telegram-Integration in HA eingerichtet ist – dann wird deren Token benutzt.

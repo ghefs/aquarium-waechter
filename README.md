@@ -1,17 +1,24 @@
 # Aquarium-Wächter – GHL ProfiLux 4 in Home Assistant
 
-> 🇬🇧 *Home Assistant add-on that monitors GHL ProfiLux 4 aquarium controllers and sends
-> Telegram alarms when a pump stops, a probe fails, the KH Director stops measuring or a
+### 🐠 Bring dein Aquarium auf das nächste Level.
+
+Alle Werte in Home Assistant, Überwachung von Pumpen, Sonden, KH-Director und
+Dosierern – und ein **Alarm aufs Handy, der auch nachts im Stumm-Modus klingelt**,
+bevor aus einer ausgefallenen Pumpe ein Notfall wird.
+
+> 🇬🇧 *Take your aquarium to the next level: Home Assistant add-on that monitors GHL ProfiLux 4
+> aquarium controllers and sends critical push (HA app) or Telegram alarms when a pump stops, a probe fails, the KH Director stops measuring or a
 > dosing container runs low. Documentation is in German – the add-on works worldwide.*
 
 Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencomputer
-(Meerwasser/Süßwasser) über die lokale GHL-API überwacht – mit Telegram-Alarm:
+(Meerwasser/Süßwasser) über die lokale GHL-API überwacht – mit Alarm aufs Handy (HA-App und/oder Telegram):
 
 - Alle Werte in Home Assistant: Steckdosen (Zustand, Strom – gruppiert nach Leiste),
   Sensoren (Temperatur, pH, Leitwert/Salinität, Redox …), Niveau, Durchfluss,
   KH-Director, ION-Director, Füllstände der Dosierbehälter (ml und %), Licht
   (Helligkeit je Kanal). Was genau geht und was nicht: [Was wird ausgelesen?](#was-wird-ausgelesen)
-- **Alarm per Telegram**, wenn etwas nicht stimmt: Pumpe steht (zu wenig Strom),
+- **Alarm aufs Handy**, wenn etwas nicht stimmt – als **kritische Benachrichtigung** der
+  HA-App (klingelt auch nachts im Stumm-Modus) und/oder per Telegram: Pumpe steht (zu wenig Strom),
   Temperatur außerhalb der Grenzen, Dosierbehälter fast leer, keine KH-Messung mehr,
   ProfiLux nicht erreichbar. Mit Verzögerung, Erinnerung und „Wieder OK“
 - **Alles in HA einstellbar:** was abgefragt wird, was überwacht wird, Grenzwerte
@@ -19,8 +26,8 @@ Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencompute
 - Beliebig viele ProfiLux, jeder mit eigener Ausstattung (1 oder 6 Steckdosenleisten,
   2 oder 12 Dosierer …). Erkannt wird automatisch, was vorhanden ist
 
-Die Alarme schickt das Add-on **direkt** an Telegram – sie kommen also auch dann,
-wenn Home Assistant selbst gerade hängt.
+Telegram-Alarme schickt das Add-on **direkt** an Telegram – sie kommen also auch dann,
+wenn Home Assistant selbst gerade hängt. Wer ganz sicher gehen will, nutzt beides.
 
 ### Warum dieses Projekt?
 
@@ -58,7 +65,7 @@ Genau diese Lücke schließt der Wächter:
    („Nur lesen“ genügt). Achtung: Nach jedem Firmware-Update ist sie wieder aus.
 2. Feste IP-Adresse für jeden ProfiLux (DHCP-Reservierung im Router).
 3. **MQTT** in Home Assistant (siehe unten).
-4. Optional: Telegram-Bot für die Alarme.
+4. Für die Alarme: die **Home-Assistant-App** auf dem Handy und/oder ein Telegram-Bot.
 
 > Die GHL-API (TCP-Port 10002) bedient **nur einen Client gleichzeitig**. Alte
 > `tcp`-Sensoren, Node-RED-Flows o. ä., die denselben ProfiLux abfragen, müssen weg –
@@ -161,8 +168,9 @@ intervall: 60
 dashboard: true
 ```
 
-Ein ProfiLux genügt natürlich auch. Die Chat-ID kommt später (Abschnitt
-[Telegram](#telegram)) – leer gelassen werden Meldungen nur ins Log geschrieben.
+Ein ProfiLux genügt natürlich auch. Wohin die Alarme gehen, kommt später (Abschnitte
+[Push an die HA-App](#push-an-die-home-assistant-app) und [Telegram](#telegram)) –
+ohne Angabe werden Meldungen nur ins Log geschrieben.
 
 ### Schritt 5 – Starten
 
@@ -327,6 +335,35 @@ Raw-Konfiguration*) in ein eigenes Dashboard. Der Knopf **„Dashboard neu erzeu
 stellt den Originalzustand wieder her (Handänderungen gehen dann verloren).
 Mit `dashboard: false` ist die Automatik ganz aus.
 
+## Push an die Home-Assistant-App
+
+Am einfachsten: Alarme direkt aufs Handy über die **Home-Assistant-App**
+(iPhone/Android) – ohne Bot, ohne Token.
+
+1. HA-App auf dem Handy installieren und anmelden (dabei Benachrichtigungen erlauben).
+2. Im Dashboard auf der **Einstellungsseite** unter **„Alarm aufs Handy“** das eigene
+   Handy einschalten („Push an iphone von max“). Das Add-on findet alle Handys mit
+   HA-App selbst; ein neu eingerichtetes Handy erscheint nach „Geräte neu einlesen“.
+3. Mit dem Knopf **„Test-Alarm senden“** prüfen.
+
+Optional lässt sich die Vorgabe auch in der Add-on-Konfiguration setzen
+(`app_push: mobile_app_iphone_von_max`, mehrere mit Komma) – die Schalter in HA
+haben aber Vorrang.
+
+| Meldung | So kommt sie |
+|---|---|
+| Störung, Erinnerung, ProfiLux nicht erreichbar | **kritisch** – klingelt auch bei Stumm-Schalter / „Nicht stören“ |
+| Wieder OK | normal |
+| Nachfüllen, Belegung geändert | leise |
+
+**iPhone:** Kritische Hinweise einmal erlauben – *Einstellungen → Home Assistant →
+Mitteilungen → Kritische Hinweise*.
+**Android:** Der Alarm kommt über den Kanal „alarm_stream“ (klingt wie ein Wecker); in den
+App-Benachrichtigungen ggf. „Nicht stören ignorieren“ erlauben.
+
+Hinweis: Die Push-Meldung geht über Home Assistant (und die Cloud-Dienste von Apple/
+Google). Hängt HA selbst, kommt sie nicht – Telegram schickt das Add-on dagegen direkt.
+
 ## Telegram
 
 Meldungen gehen an eine **Gruppe** (praktisch, wenn mehrere Leute Bescheid wissen
@@ -353,7 +390,7 @@ sollen) oder an **einzelne Personen** – oder an beides, mehrere IDs mit Komma:
    | `-100…` | Supergruppe / Kanal |
 
    Wird eine Gruppe später zur Supergruppe (passiert automatisch, z. B. beim Vergeben
-   von Admin-Rechten), ändert sich die ID – dann kommt der Telegram-Test nicht mehr an
+   von Admin-Rechten), ändert sich die ID – dann kommt der Test-Alarm in Telegram nicht mehr an
    und die neue ID muss eingetragen werden.
 4. In HA die Integration **Telegram bot** einrichten (Token, „Polling“) und die
    Chat-ID als erlaubten Chat hinzufügen.
@@ -361,7 +398,7 @@ sollen) oder an **einzelne Personen** – oder an beides, mehrere IDs mit Komma:
 
 Den Token liest das Add-on aus der Telegram-Integration – er muss nur dort gepflegt
 werden. Ohne Integration: Token unter `telegram_token` eintragen.
-Testen mit dem Knopf **„Telegram-Test senden“**.
+Testen mit dem Knopf **„Test-Alarm senden“**.
 
 Meldungen beginnen mit dem Gerätenamen, z. B. `🚨 Riff · STÖRUNG: Rückförderpumpe`.
 

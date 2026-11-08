@@ -3,6 +3,16 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.2.0
+
+- **Push an die Home-Assistant-App** (iPhone/Android): Das Add-on findet alle Handys
+  mit HA-App selbst; auf der Einstellungsseite unter **„Alarm aufs Handy“** je Handy
+  einschalten (Vorgabe auch per Option `app_push`). Dieselben Meldungen wie bei Telegram. **Störungen kommen als kritische
+  Benachrichtigung** – sie klingeln auch bei Stummschaltung und „Nicht stören“.
+  „Wieder OK“ normal, Hinweise (Nachfüllen …) leise. Telegram ist damit optional.
+- Knopf „Telegram-Test senden“ heißt jetzt **„Test-Alarm senden“** und testet alle
+  Wege (als dringende Meldung, damit man den Alarmton hört).
+
 ## 4.1.2
 
 - **Sammelstörung**: `binary_sensor.aquarium_waechter_sammelstoerung` (alle Geräte) und je

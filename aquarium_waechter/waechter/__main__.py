@@ -250,7 +250,8 @@ class App:
         self.opts = opts
         self.data_dir = Path(data_dir)
         self.store = SettingsStore(self.data_dir / "einstellungen.json")
-        self.notifier = Notifier(opts.get("telegram_chat_id"), opts.get("telegram_token") or None)
+        self.notifier = Notifier(opts.get("telegram_chat_id"), opts.get("telegram_token") or None,
+                                 opts.get("app_push"), self.store)
         # Externer Broker (Optionen mqtt_*) hat Vorrang vor dem Mosquitto-Add-on
         m = {k: opts.get(f"mqtt_{k}") or (opts.get("mqtt") or {}).get(k) for k in ("host", "port", "user", "password")}
         self.mqtt = Mqtt(m["host"] or os.environ.get("MQTT_HOST", "core-mosquitto"),
@@ -259,12 +260,14 @@ class App:
                          (m["password"] if m["host"] else None) or os.environ.get("MQTT_PASSWORD"),
                          will=("aquarium/status", "offline"))
         self.bridge = Bridge(self.mqtt)
+        self.bridge.notifier = self.notifier
+        self.bridge.on_push = self._push_changed
         self.dashboard_dirty = threading.Event()
         self.dashboard = Dashboard(HaWs(), self.data_dir / "dashboard.json") if opts.get("dashboard", True) else None
         self.bridge.commands["dashboard"] = lambda: self._dashboard(force=True)
         self.bridge.commands["rescan"] = self._rescan
         self.bridge.commands["telegram_test"] = lambda: self.notifier.send(
-            "Test", "Der Aquarium-Wächter kann Telegram-Nachrichten senden.")
+            "Test", "Der Aquarium-Wächter kann dich erreichen. So sieht ein Alarm aus.", urgent=True)
         self.workers = []
         seen = set()
         for i, d in enumerate(opts.get("geraete") or []):
@@ -285,7 +288,18 @@ class App:
             faults += [(f"{w.name} · {label}", detail) for label, detail in w.active]
         self.bridge.summary("_waechter", faults)
 
+    def _push_changed(self, phone, raw):
+        on = self.store.set_push(phone, raw)
+        log.info("Push an %s: %s", phone, "an" if on else "aus")
+
     def _rescan(self):
+        before = list(self.notifier.phones)
+        if self.notifier.refresh_phones() != before:
+            try:
+                self.bridge.announce_waechter()
+            except MqttError:
+                pass
+            self.dashboard_dirty.set()
         for w in self.workers:
             w.force_scan = True
             w.wake.set()
