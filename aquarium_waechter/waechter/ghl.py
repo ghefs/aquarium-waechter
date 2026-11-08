@@ -278,12 +278,12 @@ class Inventory:
         self.meta = {}
         self.channels, self.sensors, self.levels = [], [], []
         self.flows, self.dosers, self.lights, self.ions = [], [], [], []
-
-    def set_strips(self, text):
-        self.strips = parse_strips(text)
         self.kh = False
         self.status_bits = False
         self.scanned = False
+
+    def set_strips(self, text):
+        self.strips = parse_strips(text)
 
     def on(self, category):
         return self.enabled(category)

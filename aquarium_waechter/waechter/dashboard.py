@@ -48,11 +48,21 @@ def _md_watched(uid):
             "einschalten.{% endif %}")
 
 
+def _md_rules(uid, its):
+    """Regeln eines Blocks im Klartext (aus dem Attribut "regel" der Störungs-Sensoren)."""
+    lines = []
+    for it in its:
+        ent = f"binary_sensor.{uid}_{it['key']}_stoerung"
+        lines.append(f"{{{{ '🟢' if is_state_attr('{ent}', 'ueberwacht', true) else '⚪' }}}} "
+                     f"**{it['label']}**  \n{{{{ state_attr('{ent}', 'regel') or '–' }}}}")
+    return "**So wird überwacht** (🟢 = Alarm aktiv)\n\n" + "\n\n".join(lines)
+
+
 HELP = (
     "**So funktionieren die Einstellungen**\n\n"
     "- **Auslesen** – der Wert wird vom ProfiLux gelesen und in Home Assistant angezeigt.\n"
     "- **Alarm per Telegram** – nur wenn an, kommt bei einer Grenzverletzung eine Meldung.\n"
-    "- **Alarm, wenn …** – die Grenzen. Die Zeile *So wird überwacht* fasst sie in einem Satz zusammen.\n"
+    "- **Alarm, wenn …** – die Grenzen. Der Kasten *So wird überwacht* fasst sie je Teil in einem Satz zusammen.\n"
     "- **Alarm erst nach (Dauer)** – kurze Ausreißer werden ignoriert; der Alarm kommt erst, "
     "wenn die Störung so lange anhält.\n"
     "- **Bereiche** – ganze Gruppen (z. B. Licht) gar nicht erst lesen.\n\n"
@@ -80,7 +90,9 @@ def build(workers):
     for dev in workers:
         uid, items = dev.uid, [it for it in dev.items if dev.settings.get(it["key"])["aktiv"]]
         e = lambda comp, suffix: f"{comp}.{uid}_{suffix}"
-        cards = [{"type": "tile", "entity": e("binary_sensor", "verbindung"), "name": "Verbindung"},
+        cards = [{"type": "grid", "columns": 2, "square": False, "cards": [
+                     {"type": "tile", "entity": e("binary_sensor", "verbindung"), "name": "Verbindung"},
+                     {"type": "tile", "entity": e("binary_sensor", "sammelstoerung"), "name": "Sammelstörung"}]},
                  {"type": "markdown", "title": "Störungen", "content": _md_faults(uid)}]
         values = [it for it in items if it["kind"] == "value"]
         if values:
@@ -159,8 +171,6 @@ def build(workers):
                 rows.append({"entity": e("switch", f"{k}_abfragen"), "name": "Auslesen"})
                 if not dev.settings.get(k)["aktiv"] or it["kind"] == "light":
                     continue
-                rows.append({"type": "attribute", "entity": e("binary_sensor", f"{k}_stoerung"),
-                             "attribute": "regel", "name": "So wird überwacht"})
                 cfg = dev.bridge_cfg(it)
                 for comp, suf, field in (("switch", "ueberwachen", "enabled"), ("select", "alarm", "mode"),
                                          ("number", "min", "min"), ("number", "max", "max"),
@@ -169,9 +179,12 @@ def build(workers):
                         rows.append({"entity": e(comp, f"{k}_{suf}"),
                                      "name": Bridge.label_of(it["kind"], field)})
             if rows:
-                sections.append({"type": "grid", "cards": [
-                    {"type": "heading", "heading": title},
-                    {"type": "entities", "entities": rows, "state_color": True}]})
+                cards = [{"type": "heading", "heading": title}]
+                ruled = [it for it in its if dev.settings.get(it["key"])["aktiv"] and it["kind"] != "light"]
+                if ruled:
+                    cards.append({"type": "markdown", "content": _md_rules(uid, ruled)})
+                cards.append({"type": "entities", "entities": rows, "state_color": True})
+                sections.append({"type": "grid", "cards": cards})
         sections.append({"type": "grid", "cards": [
             {"type": "heading", "heading": "Wächter"},
             {"type": "markdown", "content": (

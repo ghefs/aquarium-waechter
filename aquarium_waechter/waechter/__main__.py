@@ -50,6 +50,7 @@ class DeviceWorker(threading.Thread):
         self.faults = {}  # key -> {"since", "alerted", "last_alert"}
         self.unreachable_since = None
         self.unreachable_alerted = False
+        self.active = []  # gemeldete Störungen [(Bezeichnung, Detail)] -> Sammelstörung
         self.last_values = {}
         self._sig = None
         self.force_scan = False
@@ -165,6 +166,17 @@ class DeviceWorker(threading.Thread):
             self.wake.wait(max(1, interval - (time.time() - start)))
             self.wake.clear()
 
+    def publish_summary(self):
+        """Sammelstörung dieses Geräts (und über alle Geräte) nach HA melden."""
+        faults = list(self.active)
+        if self.unreachable_alerted:
+            faults.insert(0, ("ProfiLux nicht erreichbar", f"keine Antwort von {self.host}"))
+        try:
+            self.app.bridge.summary(self.uid, faults)
+            self.app.publish_summary()
+        except MqttError:
+            pass
+
     def reachable(self, ok):
         opts = self.app.opts
         try:
@@ -172,9 +184,12 @@ class DeviceWorker(threading.Thread):
         except MqttError:
             pass
         if ok:
-            if self.unreachable_alerted:
+            was = self.unreachable_alerted
+            if was:
                 self.notify("Wieder erreichbar", f"{self.host} antwortet wieder.", kind="ok")
             self.unreachable_since, self.unreachable_alerted = None, False
+            if was:
+                self.publish_summary()
             return
         now = time.time()
         self.unreachable_since = self.unreachable_since or now
@@ -183,8 +198,16 @@ class DeviceWorker(threading.Thread):
             self.notify("ProfiLux nicht erreichbar",
                         f"Seit {int((now - self.unreachable_since) / 60)} min keine Antwort von {self.host}.",
                         urgent=True)
+            self.publish_summary()
 
     def check(self, values):
+        self._check(values)
+        by_key = {it["key"]: it for it in self.items}
+        self.active = [(by_key[k]["label"], f.get("detail", "")) for k, f in self.faults.items()
+                       if f.get("alerted") and k in by_key]
+        self.publish_summary()
+
+    def _check(self, values):
         now = time.time()
         reminder = int(self.app.opts.get("erinnerung", 3600))
         for it in self.items:
@@ -199,6 +222,7 @@ class DeviceWorker(threading.Thread):
             if fault:
                 if not f:
                     f = self.faults[key] = {"since": now, "alerted": False, "last": 0}
+                f["detail"] = detail
                 delay = float(st.get("delay", 0)) * 60
                 every = REMINDER.get(it["kind"], reminder)
                 if not f["alerted"] and now - f["since"] >= delay:
@@ -251,6 +275,15 @@ class App:
             self.workers.append(DeviceWorker(self, d, uid, first=(i == 0)))
         for w in self.workers:
             self.bridge.devices[w.uid] = w
+
+    def publish_summary(self):
+        """Sammelstörung über alle Geräte."""
+        faults = []
+        for w in self.workers:
+            if w.unreachable_alerted:
+                faults.append((f"{w.name} · ProfiLux nicht erreichbar", f"keine Antwort von {w.host}"))
+            faults += [(f"{w.name} · {label}", detail) for label, detail in w.active]
+        self.bridge.summary("_waechter", faults)
 
     def _rescan(self):
         for w in self.workers:

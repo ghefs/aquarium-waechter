@@ -3,6 +3,14 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.1.2
+
+- **Sammelstörung**: `binary_sensor.aquarium_waechter_sammelstoerung` (alle Geräte) und je
+  ProfiLux `binary_sensor.<gerät>_sammelstoerung` – an, solange eine Störung gemeldet ist;
+  Attribute `anzahl`, `stoerungen`, `text`. Für eigene Automationen (Lampe, Sirene, Ansage …).
+- Einstellungsseite: „So wird überwacht“ als gut lesbarer Kasten über jedem Block
+  (statt abgeschnittener Zeile je Teil).
+
 ## 4.1.1
 
 - **Steckdosenleisten**: auf der Einstellungsseite je Leiste das GHL-Produkt wählen

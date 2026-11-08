@@ -126,7 +126,24 @@ class Bridge:
                     "unique_id": f"aquarium_waechter_{cmd}", "name": name, "icon": icon,
                     "command_topic": f"{self.prefix}/_waechter/{cmd}", "default_entity_id": eid,
                     "availability_topic": self.avail, "device": dev})
+        self._conf("binary_sensor", "aquarium_waechter_sammelstoerung", {
+            "unique_id": "aquarium_waechter_sammelstoerung", "name": "Sammelstörung", "device_class": "problem",
+            "state_topic": f"{self.prefix}/_waechter/sammel",
+            "json_attributes_topic": f"{self.prefix}/_waechter/sammel/attr",
+            "default_entity_id": "binary_sensor.aquarium_waechter_sammelstoerung",
+            "availability_topic": self.avail, "device": dev})
         self._pub(self.avail, "online", retain=True)
+
+    def summary(self, uid, faults):
+        """Sammelstörung: an, sobald eine überwachte Störung gemeldet ist. Für eigene
+        Automationen (Lampe, Sirene, Sprachausgabe …)."""
+        base = f"{self.prefix}/{uid}/sammel"
+        self._pub(base, "ON" if faults else "OFF", retain=True)
+        self._pub(f"{base}/attr", {
+            "anzahl": len(faults),
+            "stoerungen": [f"{label}: {detail}" for label, detail in faults],
+            "text": "\n".join(f"{label}: {detail}" for label, detail in faults) or "Keine Störung"},
+            retain=True)
 
     def announce(self, dev):
         uid, base, inv = dev.uid, f"{self.prefix}/{dev.uid}", dev.inv
@@ -186,6 +203,11 @@ class Bridge:
                 "options": [NO_STRIP] + list(STRIP_TYPES),
                 "state_topic": f"{base}/leiste/{n}", "command_topic": f"{base}/leiste/{n}/set"},
                 f"select.{uid}_leiste_{n}", live=False)
+
+        ent("binary_sensor", "sammelstoerung", {
+            "name": "Sammelstörung", "device_class": "problem", "state_topic": f"{base}/sammel",
+            "json_attributes_topic": f"{base}/sammel/attr"},
+            f"binary_sensor.{uid}_sammelstoerung", live=False)
 
         ent("binary_sensor", "ghl_connected", {
             "name": "Verbindung", "device_class": "connectivity", "entity_category": "diagnostic",

@@ -1,5 +1,9 @@
 # Aquarium-Wächter – GHL ProfiLux 4 in Home Assistant
 
+> 🇬🇧 *Home Assistant add-on that monitors GHL ProfiLux 4 aquarium controllers and sends
+> Telegram alarms when a pump stops, a probe fails, the KH Director stops measuring or a
+> dosing container runs low. Documentation is in German – the add-on works worldwide.*
+
 Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencomputer
 (Meerwasser/Süßwasser) über die lokale GHL-API überwacht – mit Telegram-Alarm:
 
@@ -45,6 +49,8 @@ Genau diese Lücke schließt der Wächter:
 > Schutzfunktionen des ProfiLux und unabhängige Sicherungen am Becken.
 
 **→ Direkt zur [Installation](#installation)**
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gutgeschaltet)
 
 ## Voraussetzungen
 
@@ -271,8 +277,8 @@ Für viele Geräte auf einmal geht es auch als Vorgabe in der Add-on-Konfigurati
 
 ### Überwachung einstellen
 
-Auf der Einstellungsseite des Dashboards steht je Teil zuerst **„So wird überwacht“** –
-ein Satz, der die aktuelle Regel zusammenfasst, z. B.:
+Auf der Einstellungsseite des Dashboards steht über jedem Block der Kasten **„So wird
+überwacht“** – je Teil ein Satz, der die aktuelle Regel zusammenfasst, z. B.:
 
 > Alarm, wenn die Steckdose AN ist, aber weniger als 0,25 A fließen (Gerät läuft
 > nicht), wenn das länger als 2 min anhält.
@@ -340,12 +346,46 @@ Meldungen beginnen mit dem Gerätenamen, z. B. `🚨 Riff · STÖRUNG: Rückför
 
 | Meldung | Wann | Ton |
 |---|---|---|
-| `🚨 Riff · STÖRUNG: Rückförderpumpe` | Störung steht länger als die eingestellte Verzögerung an | ja |
+| `🚨 Riff · STÖRUNG: Steckdose 2.1 · Rückförderpumpe` | Störung steht länger als die eingestellte Verzögerung an | ja |
 | `🚨 Riff · Noch immer: …` | Erinnerung, solange die Störung anhält (Standard stündlich) | ja |
 | `✅ Riff · Wieder OK: …` | Störung ist vorbei | ja |
 | `ℹ️ Riff · Nachfüllen: Calcium` | Dosierbehälter unter der Warngrenze (Erinnerung täglich) | leise |
 | `🚨 Riff · ProfiLux nicht erreichbar` | 10 min keine Antwort (einstellbar) | ja |
 | `ℹ️ Riff · Belegung geändert` | Steckdose/Dosierer in GHL Connect umbenannt | leise |
+
+### Sammelstörung – für eigene Automationen
+
+Unabhängig von Telegram gibt es eine **Sammelstörung**, die man in HA für alles
+Mögliche nutzen kann (Lampe blinken lassen, Sirene, Sprachansage, Push aufs Handy …):
+
+| Entität | Bedeutung |
+|---|---|
+| `binary_sensor.aquarium_waechter_sammelstoerung` | an, sobald bei **irgendeinem** ProfiLux eine Störung gemeldet ist |
+| `binary_sensor.<gerät>_sammelstoerung` | dasselbe je ProfiLux, z. B. `binary_sensor.riff_sammelstoerung` |
+
+„Gemeldet“ heißt: genau dann, wenn auch die Telegram-Meldung käme (nach der
+eingestellten Verzögerung); „ProfiLux nicht erreichbar“ zählt mit. Attribute:
+`anzahl`, `stoerungen` (Liste) und `text` (fertiger Meldungstext).
+
+Beispiel – Wohnzimmerlampe rot, solange eine Störung anliegt:
+
+```yaml
+automation:
+  - alias: Aquarium-Störung → Lampe rot
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.aquarium_waechter_sammelstoerung
+        to: "on"
+    actions:
+      - action: light.turn_on
+        target: { entity_id: light.wohnzimmer }
+        data: { color_name: red }
+      - action: tts.speak
+        target: { entity_id: tts.home_assistant_cloud }
+        data:
+          media_player_entity_id: media_player.kueche
+          message: "Achtung Aquarium: {{ state_attr('binary_sensor.aquarium_waechter_sammelstoerung', 'text') }}"
+```
 
 ### Werte per Befehl abfragen (optional)
 
@@ -432,6 +472,16 @@ GHL-API-Kurzreferenz: Klartext über TCP 10002, `GET SWITCHCHANNEL[n] ACTSTATE`,
 `… ACTCURRENT`, `… DESCRIPTION`, `GET SENSOR[n] ACTVALUE[u]`, `GET DOSER[n] FILLLEVEL`,
 `GET KHDIRECTOR ACTVALUE`, `GET KHDIRECTOR DATARECORD[0]` (Zeit der letzten Messung).
 Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
+
+## Unterstützen
+
+Der Wächter ist kostenlos und bleibt es. Wenn er dir hilft – oder vielleicht sogar
+ein Becken gerettet hat – freue ich mich über einen Kaffee:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gutgeschaltet)
+
+Genauso wertvoll: ⭐ für das Repo, Fehler melden und Erfahrungen mit anderen
+ProfiLux-Ausstattungen teilen (Issues).
 
 ## Haftungsausschluss
 
