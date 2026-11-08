@@ -1,0 +1,29 @@
+configuration:
+  geraete:
+    name: ProfiLux-Geräte
+    description: >-
+      Pro ProfiLux: name, host (IP) und optional, welche Bereiche gelesen werden
+      (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director – Standard: alle an).
+      unbenannte_abfragen: auch Steckdosen/Dosierer ohne Namen abfragen.
+      Einzelne Teile schaltet man danach in HA mit „… abfragen“ an/aus.
+  telegram_chat_id:
+    name: Telegram-Chat-ID
+    description: Gruppe/Chat für Alarme (mehrere mit Komma). Leer = nur Log.
+  telegram_token:
+    name: Telegram-Bot-Token
+    description: Leer lassen, wenn die Telegram-Integration in HA eingerichtet ist – dann wird deren Token benutzt.
+  intervall:
+    name: Abfrageintervall (Sekunden)
+  erinnerung:
+    name: Erinnerung bei anhaltender Störung (Sekunden, 0 = aus)
+  nicht_erreichbar_nach:
+    name: Alarm „nicht erreichbar“ nach (Sekunden)
+  rescan:
+    name: Inventar neu einlesen alle (Sekunden)
+  dashboard:
+    name: Dashboard automatisch erzeugen
+    description: Eigenes Dashboard „Aquarium“. Handänderungen werden erkannt und nicht überschrieben.
+  start_meldung:
+    name: Telegram-Meldung beim Start
+  debug:
+    name: Ausführliches Log

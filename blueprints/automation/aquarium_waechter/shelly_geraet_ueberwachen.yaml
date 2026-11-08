@@ -1,0 +1,139 @@
+blueprint:
+  name: "Aquarium: Gerät an Shelly-Steckdose überwachen"
+  description: >-
+    Optional zum Aquarium-Wächter. Alarmiert über eine Benachrichtigungs-Entität
+    (z. B. die Telegram-Gruppe), wenn ein Gerät an einer
+    Shelly-Steckdose / einem Shelly-Relais eingeschaltet ist, aber zu wenig
+    Leistung zieht (Pumpe steht, Heizer defekt ...), oder wenn der Shelly
+    nicht mehr erreichbar ist. Mit Erinnerung und "Wieder OK"-Meldung.
+    Funktioniert mit Shelly Gen1 und Gen2+/Plus/Pro.
+  domain: automation
+  input:
+    ziel:
+      name: Benachrichtigen
+      description: Notify-Entität, z. B. die Telegram-Gruppe (notify.…)
+      selector:
+        entity:
+          domain: notify
+    name:
+      name: Bezeichnung
+      description: Name in der Meldung, z. B. "Strömungspumpe links"
+      default: ""
+    schalter:
+      name: Schalter (optional)
+      description: >-
+        Schaltausgang des Shelly. Ist er AUS, gilt das als gewollt (kein Alarm).
+        Leer lassen, wenn das Gerät immer laufen muss.
+      default: []
+      selector:
+        entity:
+          domain: switch
+    leistung:
+      name: Leistungssensor
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    min_leistung:
+      name: Mindestleistung
+      description: "Faustregel: ca. 50 % der normalen Leistung"
+      default: 5
+      selector:
+        number: { min: 0.5, max: 3000, step: 0.5, unit_of_measurement: W, mode: box }
+    max_leistung:
+      name: Höchstleistung (optional, 0 = aus)
+      description: z. B. für blockierten Rotor
+      default: 0
+      selector:
+        number: { min: 0, max: 3000, step: 0.5, unit_of_measurement: W, mode: box }
+    verzoegerung:
+      name: Verzögerung
+      description: So lange muss die Störung anstehen (Sekunden)
+      default: 120
+      selector:
+        number: { min: 10, max: 3600, step: 10, unit_of_measurement: s, mode: box }
+    erinnerung:
+      name: Erinnerung
+      description: Erneut melden, solange die Störung anhält (Minuten, 0 = nie)
+      default: 60
+      selector:
+        number: { min: 0, max: 1440, step: 5, unit_of_measurement: min, mode: box }
+
+mode: single
+max_exceeded: silent
+
+variables:
+  ziel: !input ziel
+  leistung: !input leistung
+  schalter: !input schalter
+  min_w: !input min_leistung
+  max_w: !input max_leistung
+  erinnerung: !input erinnerung
+  name_in: !input name
+  name: "{{ name_in if name_in else state_attr(leistung, 'friendly_name') }}"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input leistung
+    below: !input min_leistung
+    for: { seconds: !input verzoegerung }
+    id: zu_wenig
+  - trigger: template
+    value_template: "{{ max_w | float(0) > 0 and states(leistung) | float(0) > max_w | float(0) }}"
+    for: { seconds: !input verzoegerung }
+    id: zu_viel
+  - trigger: state
+    entity_id: !input leistung
+    to: "unavailable"
+    for: { minutes: 10 }
+    id: offline
+
+conditions:
+  # Schalter aus = gewollt -> kein Alarm (nicht bei "offline")
+  - condition: template
+    value_template: >-
+      {{ trigger.id == 'offline' or not schalter or is_state(schalter, 'on') }}
+
+actions:
+  - variables:
+      detail: >-
+        {% if trigger.id == 'offline' %}Shelly seit 10 min nicht erreichbar (Strom weg? WLAN?)
+        {% elif trigger.id == 'zu_viel' %}Leistung zu hoch: {{ states(leistung) }} W (Maximum {{ max_w }} W)
+        {% else %}Eingeschaltet, aber nur {{ states(leistung) }} W (Minimum {{ min_w }} W){% endif %}
+      seit: "{{ now() }}"
+  - action: notify.send_message
+    target:
+      entity_id: "{{ ziel }}"
+    data:
+      title: "🚨 STÖRUNG: {{ name }}"
+      message: "{{ detail | trim }}"
+  # Warten bis wieder OK – mit Erinnerungen
+  - repeat:
+      sequence:
+        - wait_template: >-
+            {% set p = states(leistung) %}
+            {{ (schalter and is_state(schalter, 'off'))
+               or (p not in ['unavailable', 'unknown']
+                   and p | float(0) >= min_w | float(0)
+                   and (max_w | float(0) == 0 or p | float(0) <= max_w | float(0))) }}
+          timeout: { minutes: "{{ erinnerung if erinnerung | int > 0 else 1440 }}" }
+        - if:
+            - condition: template
+              value_template: "{{ not wait.completed and erinnerung | int > 0 }}"
+          then:
+            - action: notify.send_message
+              target:
+                entity_id: "{{ ziel }}"
+              data:
+                title: "🚨 Weiterhin Störung: {{ name }}"
+                message: >-
+                  Seit {{ ((now() - as_datetime(seit)).total_seconds() / 60) | int }} min,
+                  aktuell {{ states(leistung) }} W.
+      until: "{{ wait.completed }}"
+  - delay: { seconds: 60 }
+  - action: notify.send_message
+    target:
+      entity_id: "{{ ziel }}"
+    data:
+      title: "✅ Wieder OK: {{ name }}"
+      message: >-

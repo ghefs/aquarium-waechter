@@ -1,0 +1,85 @@
+blueprint:
+  name: "Aquarium-Wächter: Telegram-Befehle"
+  description: >-
+    Beantwortet Befehle in der Telegram-Gruppe mit den aktuellen Werten aller
+    ProfiLux-Geräte des Aquarium-Wächters (auch bei mehreren Geräten):
+    /status (Störungen + wichtigste Werte), /werte (alle Messwerte mit Sollwert),
+    /steckdosen (Zustand und Strom), /dosierer (Füllstände), /hilfe.
+    Voraussetzung: Telegram-Bot-Integration mit der Gruppe als erlaubtem Chat.
+  domain: automation
+  source_url: https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/telegram_befehle.yaml
+  input:
+    ziel:
+      name: Antworten an
+      description: Notify-Entität der Telegram-Gruppe (entsteht beim Hinzufügen des Chats in der Telegram-Integration)
+      selector:
+        entity:
+          domain: notify
+
+mode: queued
+max_exceeded: silent
+
+triggers:
+  - trigger: event
+    event_type: telegram_command
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (trigger.event.data.command | lower).split('@')[0] in
+         ['/status', '/werte', '/steckdosen', '/dosierer', '/hilfe', '/start', '/help'] }}
+
+actions:
+  - variables:
+      ziel: !input ziel
+      cmd: "{{ (trigger.event.data.command | lower).split('@')[0] }}"
+      text: >-
+        {%- set ns = namespace(out='') -%} {%- set devs = states.binary_sensor | selectattr('entity_id','search','_verbindung$')
+             | map(attribute='entity_id') | map('device_id') | reject('none') | unique
+             | select('is_device_attr','manufacturer','GHL') | list -%}
+        {%- macro short(s) -%}{{ s.name | replace((device_attr(device_id(s.entity_id),'name') or '') ~ ' ','') }}{%- endmacro -%} {%- macro val(s) -%}{%- if s.state in ['unknown','unavailable'] -%}–{%- else -%}{{ s.state | float(0) | round(3 if s.state | float(0) | abs < 2 else 2) }} {{ s.attributes.get('unit_of_measurement', '') }}{%- endif -%}{%- endmacro -%} {%- if cmd in ['/hilfe', '/help', '/start'] -%} {{ 'Befehle:\n/status – Störungen + wichtigste Werte\n/werte – alle Messwerte mit Soll\n/steckdosen – Steckdosen und Strom\n/dosierer – Füllstände der Dosierbehälter' }} {%- else -%} {%- for d in devs -%} {%- set ents = device_entities(d) -%} {%- set dn = device_attr(d, 'name') -%} {%- set ns.out = ns.out ~ '\n━━ ' ~ dn ~ ' ━━\n' -%} {%- set sensors = states.sensor | selectattr('entity_id','in',ents) | list -%} {%- set werte = sensors | selectattr('entity_id','search','_(sensor_\\d+(_\\d+)?|flow_\\d+|kh)$') | list -%} {%- if cmd == '/status' -%}
+          {%- set st = states.binary_sensor | selectattr('entity_id','in',ents)
+               | selectattr('entity_id','search','_stoerung$') | list -%}
+          {%- set watched = st | selectattr('attributes.ueberwacht','eq',true) | list -%}
+          {%- set bad = watched | selectattr('state','eq','on') | list -%}
+          {%- set conn = states.binary_sensor | selectattr('entity_id','in',ents) | selectattr('entity_id','search','_verbindung$') | first -%}
+          {%- if conn is defined and conn and conn.state != 'on' -%}
+            {%- set ns.out = ns.out ~ '⚠️ ProfiLux nicht erreichbar!\n' -%}
+          {%- endif -%}
+          {%- if bad | count == 0 -%}
+            {%- set ns.out = ns.out ~ '✅ Alles OK (' ~ watched | count ~ ' Punkte überwacht)\n' -%}
+          {%- else -%}
+            {%- for b in bad -%}{%- set ns.out = ns.out ~ '🔴 ' ~ short(b) | replace(' Störung','') ~ ': ' ~ b.attributes.detail ~ '\n' -%}{%- endfor -%}
+          {%- endif -%}
+          {%- for s in werte | sort(attribute='name') -%}
+            {%- set ns.out = ns.out ~ '• ' ~ short(s) ~ ': ' ~ val(s) ~ '\n' -%}
+          {%- endfor -%}
+          {%- set kh = sensors | selectattr('entity_id','search','_kh_last$') | first -%}
+          {%- if kh is defined and kh and kh.state not in ['unknown','unavailable'] -%}
+            {%- set ns.out = ns.out ~ '• KH gemessen: ' ~ as_local(as_datetime(kh.state)).strftime('%d.%m. %H:%M') ~ '\n' -%}
+          {%- endif -%}
+        {%- elif cmd == '/werte' -%}
+          {%- for s in werte | sort(attribute='name') -%}
+            {%- set soll = states.sensor | selectattr('entity_id','eq', s.entity_id ~ '_soll') | first -%}
+            {%- set ns.out = ns.out ~ '• ' ~ short(s) ~ ': ' ~ val(s) ~ ((' (Soll ' ~ val(soll) ~ ')') if soll is defined and soll else '') ~ '\n' -%}
+          {%- endfor -%}
+          {%- for s in sensors | selectattr('entity_id','search','_level_\\d+$') | sort(attribute='name') -%}
+            {%- set ns.out = ns.out ~ '• ' ~ short(s) ~ ': ' ~ s.state ~ '\n' -%}
+          {%- endfor -%}
+        {%- elif cmd == '/steckdosen' -%}
+          {%- for b in states.binary_sensor | selectattr('entity_id','in',ents) | selectattr('entity_id','search','_switch_\\d+_state$') | sort(attribute='name') -%}
+            {%- set cur = states.sensor | selectattr('entity_id','eq', b.entity_id | replace('binary_sensor.','sensor.') | replace('_state','_current')) | first -%}
+            {%- set ns.out = ns.out ~ ('🟢 ' if b.state == 'on' else '⚫ ') ~ short(b) ~ ((': ' ~ val(cur)) if cur is defined and cur else '') ~ '\n' -%}
+          {%- endfor -%}
+          {%- set ns.out = ns.out ~ '(🟢 an · ⚫ aus)\n' -%}
+        {%- elif cmd == '/dosierer' -%}
+          {%- for s in sensors | selectattr('entity_id','search','_doser_\\d+$') | sort(attribute='name') -%}
+            {%- set ns.out = ns.out ~ '• ' ~ short(s) | replace(' Füllstand','') ~ ': ' ~ (s.state | float(0) | round(0) | int) ~ ' ml\n' -%}
+          {%- endfor -%}
+        {%- endif -%} {%- endfor -%} {{ ns.out | trim if ns.out else 'Keine ProfiLux-Daten gefunden.' }} {%- endif -%}
+  - action: notify.send_message
+    target:
+      entity_id: "{{ ziel }}"
+    data:
+      title: "ℹ️ {{ {'/status':'Status', '/werte':'Messwerte', '/steckdosen':'Steckdosen', '/dosierer':'Dosierbehälter'}.get(cmd, 'Hilfe') }}"
+      message: "{{ text }}"

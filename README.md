@@ -1,0 +1,257 @@
+# Aquarium-Wächter – GHL ProfiLux 4 in Home Assistant
+
+Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencomputer
+(Meerwasser/Süßwasser) über die lokale GHL-API überwacht – mit Telegram-Alarm:
+
+- Alle Werte in Home Assistant: Steckdosen (Zustand, Strom), Sensoren (Temperatur,
+  pH, Leitwert/Salinität, Redox …), Niveau, KH-Director (Wert und Zeitpunkt der
+  letzten Messung), Füllstände der Dosierbehälter
+- **Alarm per Telegram**, wenn etwas nicht stimmt: Pumpe steht (zu wenig Strom),
+  Temperatur außerhalb der Grenzen, Dosierbehälter fast leer, keine KH-Messung mehr,
+  ProfiLux nicht erreichbar. Mit Verzögerung, Erinnerung und „Wieder OK“
+- **Alles in HA einstellbar:** was abgefragt wird, was überwacht wird, Grenzwerte
+- **Dashboard wird automatisch erzeugt** – eine Übersicht und eine Einstellungsseite je ProfiLux
+- Beliebig viele ProfiLux, jeder mit eigener Ausstattung (1 oder 6 Steckdosenleisten,
+  2 oder 12 Dosierer …). Erkannt wird automatisch, was vorhanden ist
+
+Die Alarme schickt das Add-on **direkt** an Telegram – sie kommen also auch dann,
+wenn Home Assistant selbst gerade hängt.
+
+> **Kein offizielles Produkt von GHL.** Unabhängiges Open-Source-Projekt, nicht mit
+> GHL Advanced Technology verbunden oder von GHL unterstützt. „GHL“, „ProfiLux“ und
+> „GHL Connect“ sind Marken ihrer jeweiligen Inhaber und werden hier nur verwendet,
+> um zu beschreiben, mit welchen Geräten das Add-on funktioniert.
+> Ausgänge werden nur gelesen, niemals geschaltet.
+
+## Voraussetzungen
+
+1. **GHL-API am ProfiLux einschalten** – in GHL Connect unter *System → GHL API*
+   („Nur lesen“ genügt). Achtung: Nach jedem Firmware-Update ist sie wieder aus.
+2. Feste IP-Adresse für jeden ProfiLux (DHCP-Reservierung im Router).
+3. **MQTT** in Home Assistant (siehe unten).
+4. Optional: Telegram-Bot für die Alarme.
+
+> Die GHL-API (TCP-Port 10002) bedient **nur einen Client gleichzeitig**. Alte
+> `tcp`-Sensoren, Node-RED-Flows o. ä., die denselben ProfiLux abfragen, müssen weg –
+> sonst gibt es sporadische Lesefehler.
+
+## MQTT einrichten – wozu und wie
+
+Das Add-on schickt seine Werte über **MQTT** an Home Assistant. MQTT ist ein
+kleiner „Briefkasten“ innerhalb von Home Assistant: Das Add-on legt dort Werte ab,
+Home Assistant holt sie heraus und legt daraus automatisch Geräte und Entitäten an
+(„MQTT Discovery“). Umgekehrt landen Einstellungen, die man in HA ändert (z. B.
+„Temperatur Minimum“), über denselben Weg beim Add-on.
+
+**Einrichtung – einmalig, ca. 2 Minuten:**
+
+1. *Einstellungen → Add-ons → Add-on-Store* → **Mosquitto broker** installieren
+   und starten (Haken bei „Beim Booten starten“).
+2. *Einstellungen → Geräte & Dienste*: Home Assistant meldet „MQTT gefunden“ →
+   **Konfigurieren** → **Absenden**. Fertig.
+
+Benutzername und Passwort muss man **nicht** eintragen: Das Add-on bekommt den
+Zugang automatisch vom Supervisor. Ein bereits vorhandener Mosquitto (z. B. für
+Zigbee2MQTT) wird einfach mitbenutzt.
+
+Nur wer einen **externen** Broker verwenden will (kein Mosquitto-Add-on), trägt ihn
+in der Add-on-Konfiguration im YAML-Modus ein:
+
+```yaml
+mqtt:
+  host: 192.168.1.10
+  port: 1883
+  user: aquarium
+  password: geheim
+```
+
+## Installation
+
+1. *Einstellungen → Add-ons → Add-on-Store* → ⋮ → **Repositories** →
+   `https://github.com/ghefs/aquarium-waechter` hinzufügen.
+2. **Aquarium-Wächter** installieren.
+3. Reiter **Konfiguration** – Geräte eintragen:
+
+   ```yaml
+   geraete:
+     - name: Riff
+       host: 192.168.1.50
+     - name: Quarantäne
+       host: 192.168.1.51
+       kh_director: false
+       dosierer: false
+   telegram_chat_id: "-1001234567890"
+   ```
+
+4. Starten. Nach 1–2 Minuten erscheint je ProfiLux ein Gerät unter *MQTT* und in der
+   Seitenleiste das Dashboard **Aquarium**.
+
+### Was wird ausgelesen?
+
+Der Wächter fragt beim Start ab, was der ProfiLux hat, und legt nur das an.
+Feinsteuerung auf drei Ebenen:
+
+| Ebene | Wo | Beispiel |
+|---|---|---|
+| Bereich ganz aus | Add-on-Konfiguration je Gerät: `steckdosen`, `sensoren`, `niveau`, `durchfluss`, `dosierer`, `kh_director` (Standard: an) | Becken ohne KH-Director: `kh_director: false` |
+| Unbenannte mitnehmen | `unbenannte_abfragen: true` | Kunde hat Steckdosen in GHL nicht benannt |
+| Einzelnes Teil | In HA: Schalter **„… abfragen“** auf der Einstellungsseite | Ungenutzten Dosierer ausblenden |
+
+Standardmäßig wird abgefragt, was in GHL Connect **einen Namen hat**. Weniger
+abfragen = schnellere Runden (jeder Wert kostet ca. 0,4 s).
+
+Mit dem Knopf **„Geräte neu einlesen“** wird das Inventar sofort neu gelesen
+(sonst stündlich) – z. B. nach Umbenennen in GHL Connect.
+
+### Überwachung einstellen
+
+Auf der Einstellungsseite des Dashboards, je Teil:
+
+- **Überwachen** an/aus
+- **Minimum / Maximum** – Steckdosen: Strom in A (Pumpe steht → Strom fällt);
+  Messwerte: zulässiger Bereich; Dosierer: „Warnen unter“ ml;
+  KH-Messung: Alarm, wenn seit X Stunden keine Messung mehr erfolgt ist
+  (Standard: an, 7 h – der KH-Director misst typischerweise alle 4–5 h)
+- **Verzögerung** – so lange muss die Störung anstehen, bevor gemeldet wird
+- Niveau: **Alarm bei 0 / bei 1** (am besten mit dem Schwimmer ausprobieren)
+- Sensoren: **Art** (Temperatur, pH, Leitwert …) – bestimmt Einheit und Zusatzwerte
+  (Salinität, Dichte). Wird beim ersten Start aus Name und Wert geschätzt
+
+Die Einstellungen speichert das Add-on selbst; sie überleben Neustarts und Updates.
+
+### Dosierbehälter neu belegt / Steckdose umgesteckt
+
+Entitäten hängen am **Steckplatz** (Dosierer 4, Steckdose 7 …), nicht am Namen. Wird
+in GHL Connect ein Name geändert, z. B. Dosierer 4 „Kalium“ → „Magnesium“:
+
+- Name in HA ändert sich mit, Entitäts-ID, Verlauf und Dashboard bleiben
+- Die Einstellungen (z. B. „Warnen unter 500 ml“) bleiben – der Wächter **meldet die
+  Änderung per Telegram** („Belegung geändert: Kalium → Magnesium – Überwachung
+  bleibt an, bitte prüfen“)
+- Eine laufende Störung zu diesem Steckplatz wird zurückgesetzt
+
+Nachfüllen eines Behälters braucht nichts weiter: Steigt der Füllstand über die
+Grenze, kommt „Wieder OK“.
+
+### Dashboard
+
+Das Add-on legt ein **eigenes** Dashboard „Aquarium“ an und pflegt es (neue
+Steckdosen, umbenannte Teile …). Andere Dashboards fasst es nie an.
+
+Wird das Dashboard **von Hand geändert**, erkennt das Add-on das und überschreibt es
+nicht mehr. Wer es anpassen möchte, kopiert es am besten (*⋮ → Bearbeiten → ⋮ →
+Raw-Konfiguration*) in ein eigenes Dashboard. Der Knopf **„Dashboard neu erzeugen“**
+stellt den Originalzustand wieder her (Handänderungen gehen dann verloren).
+Mit `dashboard: false` ist die Automatik ganz aus.
+
+## Telegram
+
+1. Bei **@BotFather** einen Bot anlegen (`/newbot`), Token notieren.
+2. Bot in die gewünschte Gruppe einladen, dort eine Nachricht schreiben.
+3. In HA die Integration **Telegram bot** einrichten (Token eintragen, Polling) und
+   die Gruppe als erlaubten Chat hinzufügen – dabei wird die Chat-ID angezeigt
+   (Gruppen beginnen mit `-`).
+4. Chat-ID in der Add-on-Konfiguration bei `telegram_chat_id` eintragen.
+
+Den Token liest das Add-on aus der Telegram-Integration – er muss nur dort gepflegt
+werden. Ohne Integration: Token unter `telegram_token` eintragen.
+Testen mit dem Knopf **„Telegram-Test senden“**.
+
+Meldungen beginnen mit dem Gerätenamen, z. B. `🚨 Riff · STÖRUNG: Rückförderpumpe`.
+
+### Welche Meldungen kommen?
+
+| Meldung | Wann | Ton |
+|---|---|---|
+| `🚨 Riff · STÖRUNG: Rückförderpumpe` | Störung steht länger als die eingestellte Verzögerung an | ja |
+| `🚨 Riff · Noch immer: …` | Erinnerung, solange die Störung anhält (Standard stündlich) | ja |
+| `✅ Riff · Wieder OK: …` | Störung ist vorbei | ja |
+| `ℹ️ Riff · Nachfüllen: Calcium` | Dosierbehälter unter der Warngrenze (Erinnerung täglich) | leise |
+| `🚨 Riff · ProfiLux nicht erreichbar` | 10 min keine Antwort (einstellbar) | ja |
+| `ℹ️ Riff · Belegung geändert` | Steckdose/Dosierer in GHL Connect umbenannt | leise |
+
+### Werte per Befehl abfragen (optional)
+
+In der Gruppe einfach einen Befehl schreiben – der Bot antwortet mit den aktuellen
+Werten aller ProfiLux:
+
+| Befehl | Antwort |
+|---|---|
+| `/status` | Störungen und die wichtigsten Messwerte, Zeitpunkt der letzten KH-Messung |
+| `/werte` | alle Messwerte mit Sollwert, Niveau |
+| `/steckdosen` | alle Steckdosen: an/aus und Strom |
+| `/dosierer` | Füllstände aller Dosierbehälter |
+| `/hilfe` | Befehlsliste |
+
+Beispiel `/status`:
+
+```
+ℹ️ Status
+━━ Riff ━━
+✅ Alles OK (9 Punkte überwacht)
+• KH: 7.9 dKH
+• pH: 8.2
+• Salinität: 35.0 PSU
+• Temperatur: 25.4 °C
+• KH gemessen: 03.05. 09:12
+```
+
+Einrichten:
+
+1. Blueprint importieren: *Einstellungen → Automationen → Blueprints → Blueprint
+   importieren* →
+   `https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/telegram_befehle.yaml`
+2. **Automation erstellen** → bei „Antworten an“ die Notify-Entität der Gruppe wählen
+   (sie entsteht, wenn die Gruppe in der Telegram-Integration als erlaubter Chat
+   hinzugefügt wird, z. B. `notify.aquarium_gruppe`).
+3. Optional, damit die Befehle beim Tippen von `/` als Menü erscheinen: bei
+   **@BotFather** → `/setcommands` → Bot wählen → senden:
+
+   ```
+   status - Störungen und wichtigste Werte
+   werte - alle Messwerte mit Sollwerten
+   steckdosen - Steckdosen und Strom
+   dosierer - Füllstände der Dosierbehälter
+   hilfe - Befehlsliste
+   ```
+
+Der Bot antwortet nur in Chats, die in der Telegram-Integration erlaubt sind.
+Die Befehle laufen über Home Assistant – die Alarme dagegen kommen direkt vom Add-on.
+
+## Optional: Shelly-Steckdosen
+
+Geräte an Shelly-Steckdosen (Plug S, Plus Plug, Pro …) überwacht nicht das Add-on,
+sondern Home Assistant selbst – mit dem Blueprint
+`blueprints/automation/aquarium_waechter/shelly_geraet_ueberwachen.yaml`
+(Leistung zu gering/zu hoch, Shelly offline). Je Gerät eine Automation anlegen und
+wählen, welcher Leistungssensor, welche Grenzen und welches Benachrichtigungsziel.
+Wer keine Shellys hat, ignoriert ihn einfach.
+
+Import: *Einstellungen → Automationen → Blueprints → Blueprint importieren* →
+`https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/shelly_geraet_ueberwachen.yaml`
+
+## Entwicklung
+
+Nur Python-Standardbibliothek. Lokal testen mit Simulatoren:
+
+```sh
+python3 tests/sim_ghl.py 19001 klein &
+python3 tests/sim_ghl.py 19002 gross &
+python3 tests/sim_mqtt.py 19883 &
+cd aquarium_waechter && python3 -m waechter ../tests/options.json --data ../tests/_tmp
+```
+
+GHL-API-Kurzreferenz: Klartext über TCP 10002, `GET SWITCHCHANNEL[n] ACTSTATE`,
+`… ACTCURRENT`, `… DESCRIPTION`, `GET SENSOR[n] ACTVALUE[u]`, `GET DOSER[n] FILLLEVEL`,
+`GET KHDIRECTOR ACTVALUE`, `GET KHDIRECTOR DATARECORD[0]` (Zeit der letzten Messung).
+Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
+
+## Stichworte
+
+GHL ProfiLux 4, ProfiLux 3, GHL Connect, Aquariencomputer, Aquarium Controller,
+Riffaquarium, Meerwasseraquarium, KH Director, Doser, Dosierpumpe, Home Assistant
+Add-on, MQTT, Telegram, Pumpenüberwachung, Aquarium Alarm
+
+## Lizenz
+
+MIT – siehe [LICENSE](LICENSE). Marken: siehe Hinweis oben.
