@@ -8,6 +8,7 @@ blueprint:
     nicht mehr erreichbar ist. Mit Erinnerung und "Wieder OK"-Meldung.
     Funktioniert mit Shelly Gen1 und Gen2+/Plus/Pro.
   domain: automation
+  source_url: https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/shelly_geraet_ueberwachen.yaml
   input:
     ziel:
       name: Benachrichtigen

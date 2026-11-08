@@ -3,6 +3,13 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.2.2
+
+- Einstellung „Alarm per Telegram“ heißt jetzt **„Alarm melden“** (gilt für Push an die
+  HA-App und Telegram). Entitäts-IDs und Einstellungen bleiben gleich.
+- Neues **[Wiki](https://github.com/ghefs/aquarium-waechter/wiki)**: alle Entitäten, Beispiele für
+  eigene Automationen, fertige Automationen, alle Optionen, Fehlersuche.
+
 ## 4.2.1
 
 - Reiter **Dokumentation** im Add-on mit Kurzanleitung.

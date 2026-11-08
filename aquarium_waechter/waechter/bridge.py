@@ -357,7 +357,7 @@ class Bridge:
 
     # Wortlaut der Einstellungen – so steht es in HA und im Dashboard
     LABELS = {
-        "enabled": "Alarm per Telegram",
+        "enabled": "Alarm melden",
         ("switch", "min"): "Alarm, wenn AN und Strom unter",
         ("switch", "max"): "Alarm, wenn Strom über (0 = aus)",
         ("value", "min"): "Alarm, wenn Wert unter",

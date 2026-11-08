@@ -44,7 +44,7 @@ def _md_watched(uid):
             "{% set ns.n = ns.n + 1 %}"
             "{{ '🔴' if s.state == 'on' else '🟢' }} **{{ s.attributes.bezeichnung or s.name }}** – "
             "jetzt: {{ s.attributes.detail }}  \n<small>{{ s.attributes.regel }}</small>\n\n{% endfor %}"
-            "{% if ns.n == 0 %}Noch nichts überwacht – auf der Einstellungsseite „Alarm per Telegram“ "
+            "{% if ns.n == 0 %}Noch nichts überwacht – auf der Einstellungsseite „Alarm melden“ "
             "einschalten.{% endif %}")
 
 
@@ -61,7 +61,7 @@ def _md_rules(uid, its):
 HELP = (
     "**So funktionieren die Einstellungen**\n\n"
     "- **Auslesen** – der Wert wird vom ProfiLux gelesen und in Home Assistant angezeigt.\n"
-    "- **Alarm per Telegram** – nur wenn an, kommt bei einer Grenzverletzung eine Meldung.\n"
+    "- **Alarm melden** – nur wenn an, kommt bei einer Grenzverletzung eine Meldung (Push an die HA-App und/oder Telegram).\n"
     "- **Alarm, wenn …** – die Grenzen. Der Kasten *So wird überwacht* fasst sie je Teil in einem Satz zusammen.\n"
     "- **Alarm erst nach (Dauer)** – kurze Ausreißer werden ignoriert; der Alarm kommt erst, "
     "wenn die Störung so lange anhält.\n"

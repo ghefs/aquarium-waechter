@@ -4,7 +4,8 @@
 
 Die vollständige Anleitung (Installation, Telegram, Push an die HA-App, Steckdosenleisten,
 Überwachung einstellen) steht auf GitHub:
-**https://github.com/ghefs/aquarium-waechter**
+**https://github.com/ghefs/aquarium-waechter/wiki** – dort auch alle Entitäten und
+Beispiele für eigene Automationen.
 
 ## Kurz
 
