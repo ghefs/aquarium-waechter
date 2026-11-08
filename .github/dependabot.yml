@@ -1,0 +1,10 @@
+# Hält die in den GitHub-Workflows benutzten Actions aktuell.
+# (Das Add-on selbst nutzt nur die Python-Standardbibliothek.)
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Actions"
