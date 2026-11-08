@@ -58,6 +58,10 @@ Genau diese Lücke schließt der Aquarium-Wächter:
 - Alles mit Verzögerung gegen Fehlalarme, Erinnerung und „Wieder OK“ – aufs Handy,
   per HA-App und/oder Telegram.
 
+**Aktiv gepflegt:** Ich betreue selbst Aquarien mit ProfiLux und nutze das Add-on dort
+jeden Tag. Solange das so ist, wird es weiterentwickelt und gepflegt – mit Updates,
+Fehlerkorrekturen und Anpassungen an neue Firmware.
+
 > **Kein offizielles Produkt von GHL.** Unabhängiges Open-Source-Projekt, nicht mit
 > GHL Advanced Technology verbunden oder von GHL unterstützt. „GHL“, „ProfiLux“ und
 > „GHL Connect“ sind Marken ihrer jeweiligen Inhaber und werden hier nur verwendet,

@@ -58,6 +58,10 @@ That gap is what this add-on closes:
 - **Dosing containers:** “refill” warning in time, in ml and %.
 - **ProfiLux gone** (power cut, Wi-Fi, API off after a firmware update)? → alarm.
 
+**Actively maintained:** I look after aquariums with a ProfiLux myself and use this add-on
+there every day. As long as that is the case, it will be developed and maintained –
+with updates, bug fixes and adjustments to new firmware.
+
 > **Not an official GHL product.** Independent open-source project, not affiliated
 > with or endorsed by GHL Advanced Technology. “GHL”, “ProfiLux” and “GHL Connect”
 > are trademarks of their respective owners and are only used to describe which
