@@ -318,6 +318,9 @@ class Bridge:
                 for suffix in ("enabled", "min", "max", "delay"):
                     gone("switch" if suffix == "enabled" else "number", f"cfg_{key}_{suffix}")
                 gone("sensor", f"{key}_current")
+            if kind == "doser" and not it.get("capacity"):
+                for comp, suffix in (("switch", "enabled"), ("number", "min")):
+                    gone(comp, f"cfg_{key}_{suffix}")
             for comp, suffix, conf in cfgs:
                 field = suffix.rsplit("_", 1)[1]
                 ent(comp, suffix, {**conf, **cfg_t(field)},
@@ -405,7 +408,8 @@ class Bridge:
     @classmethod
     def _config_entities(cls, it, uid):
         key, kind, name, unit = it["key"], it["kind"], it["label"], it.get("unit") or ""
-        if kind == "light" or (kind == "switch" and not it.get("current")):
+        if kind == "light" or (kind == "switch" and not it.get("current")) \
+                or (kind == "doser" and not it.get("capacity")):
             return []
 
         def num(lo, hi, step, u, field):

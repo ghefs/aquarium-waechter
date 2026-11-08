@@ -128,11 +128,14 @@ def build(workers):
                 for it in its]})
         dosers = [it for it in items if it["kind"] == "doser"]
         if dosers:
-            rows = []
-            for it in dosers:
-                rows.append({"entity": e("sensor", it["key"]), "name": it["label"]})
-            cards.append({"type": "entities", "title": "Dosierbehälter", "entities": rows})
             pct = [it for it in dosers if it.get("capacity")]
+            nocap = [it for it in dosers if not it.get("capacity")]
+            rows = [{"entity": e("sensor", it["key"]), "name": it["label"]} for it in (pct or dosers)]
+            cards.append({"type": "entities", "title": "Dosierbehälter", "entities": rows})
+            if pct and nocap:
+                cards.append({"type": "markdown", "content": (
+                    "**Ohne Füllstand** (im ProfiLux keine Behältergröße eingetragen): "
+                    + ", ".join(it["label"] for it in nocap))})
             cards.append({"type": "history-graph", "hours_to_show": 336,
                           "title": "Füllstände in % – 14 Tage" if pct else "Füllstände – 14 Tage",
                           "entities": [{"entity": e("sensor", f"{it['key']}_pct" if pct else it["key"]),
@@ -200,8 +203,8 @@ def build(workers):
                 "**Änderungen von Hand** werden erkannt und dann nicht mehr überschrieben – "
                 "für eigene Anpassungen das Dashboard besser kopieren. "
                 "Mit dem Knopf unten wird es neu erzeugt (Handänderungen gehen verloren).\n\n"
-                "☕ **Dieses Add-on ist kostenlos.** Gefällt es dir? "
-                "[Spendier mir einen Kaffee](https://buymeacoffee.com/gutgeschaltet) · "
+                "🍖 **Dieses Add-on ist kostenlos.** Gefällt es dir? "
+                "[Spendier mir einen Schweinebraten](https://buymeacoffee.com/gutgeschaltet) · "
                 "[⭐ auf GitHub](https://github.com/ghefs/aquarium-waechter)")},
             {"type": "entities", "entities": ["button.aquarium_waechter_dashboard_neu",
                                               "button.aquarium_waechter_telegram_test",

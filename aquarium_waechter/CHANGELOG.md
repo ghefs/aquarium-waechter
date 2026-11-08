@@ -3,6 +3,13 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.3.4
+
+- **Dosierer ohne Behältergröße** (Füllstand wird im ProfiLux nicht geführt, z. B. Probenwasser,
+  Abwasser): nur noch Anzeige, keine Einstellung „Nachfüllen melden“ mehr – sie hätte bei 0 ml
+  täglich gemeldet. Im Dashboard steht ein Hinweis, welche Dosierer keinen Füllstand haben.
+- Spendenknopf jetzt bayerisch: 🍖 Schweinebraten statt Kaffee.
+
 ## 4.3.3
 
 - Kleine Textänderungen im Dashboard.

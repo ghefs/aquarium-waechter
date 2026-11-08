@@ -10,7 +10,7 @@ dosing pumps – and an **alarm on your phone that rings even at night in silent
 before a failed pump turns into an emergency.
 
 > ☕ **The add-on is free – and will stay free.** If it saves you a sleepless night or
-> even a whole tank, buy me a coffee. It keeps the project alive and funds new features.
+> even a whole tank, buy me a coffee – or, since I'm from Bavaria, a *Schweinebraten* (roast pork) 🍖. It keeps the project alive and funds new features.
 >
 > <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
 

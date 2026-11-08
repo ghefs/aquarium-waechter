@@ -201,6 +201,8 @@ def rule(item, st):
         return (f"Alarm, wenn der KH-Director länger als {de(st['max'], 'h')} nicht gemessen hat "
                 "(sowie bei Leck- oder Messbereichsalarm, ab ProfiLux-Firmware 7.52).")
     if kind == "doser":
+        if not item.get("capacity"):
+            return "Nur Anzeige – im ProfiLux ist für diesen Behälter keine Größe eingetragen, der Füllstand wird dort nicht geführt. Für die Meldung „Nachfüllen“ in GHL Connect die Behältergröße eintragen und danach „Geräte neu einlesen“."
         if not st["enabled"]:
             return "Kein Alarm (Überwachung aus)."
         return f"Meldung „Nachfüllen“, wenn weniger als {de(st['min'], 'ml')} im Behälter sind (1× täglich)."
@@ -257,7 +259,7 @@ def evaluate(item, st, values):
                                     f"Reagenz/Referenz leer oder Director gestört?")
         return watched, True, f"vor {fmt(round(age, 1), 'h')} ({when})"
     if kind == "doser":
-        watched, v = st["enabled"], values.get(key)
+        watched, v = st["enabled"] and bool(item.get("capacity")), values.get(key)
         if v is None:
             return watched, None, "kein Wert"
         if not watched:

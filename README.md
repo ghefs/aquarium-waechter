@@ -10,11 +10,11 @@ eigene Sensoren: alle Werte automatisch in HA, Überwachung von Pumpen, Sonden,
 KH-Director und Dosierern – und ein **Alarm aufs Handy, der auch nachts im Stumm-Modus klingelt**,
 bevor aus einer ausgefallenen Pumpe ein Notfall wird.
 
-> ☕ **Dieses Add-on ist kostenlos – und soll es bleiben.** Wenn es dir eine schlaflose
-> Nacht oder sogar ein Becken erspart, spendier mir einen Kaffee. Das hält das Projekt
+> 🍖 **Dieses Add-on ist kostenlos – und soll es bleiben.** Wenn es dir eine schlaflose
+> Nacht oder sogar ein Becken erspart, spendier mir einen Schweinebraten (bin ja aus Bayern). Das hält das Projekt
 > am Leben und finanziert neue Funktionen.
 >
-> <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
+> <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Spendier%20mir%20einen%20Schweinebraten&emoji=%F0%9F%8D%96&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Spendier mir einen Schweinebraten" height="50"></a>
 
 > 🇬🇧 **English:** Home Assistant add-on for **GHL ProfiLux 4** aquarium controllers – all
 > values in HA, monitoring of pumps, probes, KH Director and dosers, and **critical push
@@ -72,7 +72,7 @@ Fehlerkorrekturen und Anpassungen an neue Firmware.
 > Das Add-on ist eine zusätzliche Überwachung und **kein Ersatz** für die
 > Schutzfunktionen des ProfiLux und unabhängige Sicherungen am Becken.
 
-**→ [Schnellstart](#schnellstart)** · 📖 [Wiki mit allen Details](https://github.com/ghefs/aquarium-waechter/wiki) · ☕ [Projekt unterstützen](#unterstützen)
+**→ [Schnellstart](#schnellstart)** · 📖 [Wiki mit allen Details](https://github.com/ghefs/aquarium-waechter/wiki) · 🍖 [Projekt unterstützen](#unterstützen)
 
 ## Schnellstart
 
@@ -167,9 +167,9 @@ Was heute schon geht: [Was wird ausgelesen?](https://github.com/ghefs/aquarium-w
 
 Das Add-on ist kostenlos und bleibt es. Hinter jeder Version stecken viele Abende
 Entwicklung und Tests am echten Becken. Wenn es dir hilft – oder vielleicht sogar
-ein Becken gerettet hat – freue ich mich über einen Kaffee:
+ein Becken gerettet hat – freue ich mich über einen Schweinebraten – oder wenigstens einen Kaffee:
 
-<a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
+<a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Spendier%20mir%20einen%20Schweinebraten&emoji=%F0%9F%8D%96&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Spendier mir einen Schweinebraten" height="50"></a>
 
 Genauso wertvoll: ⭐ für das Repo, Fehler melden und Erfahrungen mit anderen
 ProfiLux-Ausstattungen teilen (Issues).
