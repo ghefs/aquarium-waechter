@@ -369,6 +369,14 @@ class Inventory:
                 if name is None:
                     break
                 name = name.strip()
+                # Kanal ohne Lichtkurve (POINTCOUNT 0) = nicht benutzt; ältere Firmware: NACK -> nach Name
+                pc = g.try_get(f"GET ILLUMINATION[{i}] POINTCOUNT")
+                try:
+                    unused = pc is not None and int(float(pc)) <= 0
+                except ValueError:
+                    unused = False
+                if unused and not self.keep(f"light_{i}") and not self.cfg.get("unbenannte_abfragen"):
+                    continue
                 self.lights.append({"i": i, "name": name or f"Licht {i + 1}", "named": bool(name)})
             trim(self.lights, "light", self.keep)
         self.scanned = True

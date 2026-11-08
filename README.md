@@ -27,6 +27,7 @@ Home-Assistant-Add-on, das einen oder mehrere **GHL ProfiLux 4** Aquariencompute
   HA-App (klingelt auch nachts im Stumm-Modus) und/oder per Telegram: Pumpe steht (zu wenig Strom),
   Temperatur außerhalb der Grenzen, Dosierbehälter fast leer, keine KH-Messung mehr,
   ProfiLux nicht erreichbar. Mit Verzögerung, Erinnerung und „Wieder OK“
+- **Wartungsmodus:** Ein Schalter pausiert die Alarme, solange man am Becken arbeitet
 - **Alles in HA einstellbar:** was abgefragt wird, was überwacht wird, Grenzwerte
 - **Dashboard wird automatisch erzeugt** – eine Übersicht und eine Einstellungsseite je ProfiLux
 - Beliebig viele ProfiLux, jeder mit eigener Ausstattung (1 oder 6 Steckdosenleisten,

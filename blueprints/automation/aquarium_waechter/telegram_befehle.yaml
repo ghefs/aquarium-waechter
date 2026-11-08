@@ -37,7 +37,7 @@ actions:
       cmd: >-
         {{ '/' ~ sub if sub in ['status', 'werte', 'steckdosen', 'dosierer'] else '/hilfe' }}
       text: >-
-        {%- set ns = namespace(out='') -%} {%- set devs = states.binary_sensor | selectattr('entity_id','search','_verbindung$')
+        {%- set ns = namespace(out='') -%} {%- if is_state('switch.aquarium_waechter_wartung','on') -%}{%- set ns.out = '🔧 Wartung: Alarme pausiert bis ' ~ state_attr('switch.aquarium_waechter_wartung','bis') ~ '\n' -%}{%- endif -%} {%- set devs = states.binary_sensor | selectattr('entity_id','search','_verbindung$')
              | map(attribute='entity_id') | map('device_id') | reject('none') | unique
              | select('is_device_attr','manufacturer','GHL') | list -%}
         {%- macro short(s) -%}{{ s.name | replace((device_attr(device_id(s.entity_id),'name') or '') ~ ' ','') }}{%- endmacro -%} {%- macro val(s) -%}{%- if s.state in ['unknown','unavailable'] -%}–{%- else -%}{{ s.state | float(0) | round(3 if s.state | float(0) | abs < 2 else 2) }} {{ s.attributes.get('unit_of_measurement', '') }}{%- endif -%}{%- endmacro -%} {%- if cmd in ['/hilfe', '/help', '/start'] -%} {{ 'Aquarium-Befehle:\n/aq – Störungen + wichtigste Werte\n/aq_werte – alle Messwerte mit Soll\n/aq_steckdosen – Steckdosen und Strom\n/aq_dosierer – Füllstände der Dosierbehälter' }} {%- else -%} {%- for d in devs -%} {%- set ents = device_entities(d) -%} {%- set dn = device_attr(d, 'name') -%} {%- set ns.out = ns.out ~ '\n━━ ' ~ dn ~ ' ━━\n' -%} {%- set sensors = states.sensor | selectattr('entity_id','in',ents) | list -%} {%- set werte = sensors | selectattr('entity_id','search','_(sensor_\\d+(_\\d+)?|flow_\\d+|kh)$') | list -%} {%- if cmd == '/status' -%}

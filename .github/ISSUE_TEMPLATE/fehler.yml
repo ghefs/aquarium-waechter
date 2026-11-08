@@ -1,0 +1,46 @@
+name: 🐞 Fehler melden
+description: Etwas funktioniert nicht wie beschrieben.
+labels: [fehler]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Melden! Bitte vorher kurz ins [Wiki → Fehlersuche](https://github.com/ghefs/aquarium-waechter/wiki/Fehlersuche) schauen.
+        **Keine privaten Daten posten:** IP-Adressen, Chat-IDs, Tokens und Namen vorher unkenntlich machen.
+  - type: textarea
+    id: was
+    attributes:
+      label: Was passiert?
+      description: Was hast du gemacht, was ist passiert, was hättest du erwartet?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version des Aquarium-Wächters
+      description: Steht beim Add-on oben, z. B. 4.3.0
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: ProfiLux-Modell und Firmware
+      description: z. B. ProfiLux 4, Firmware 7.52 (GHL Connect → System)
+    validations:
+      required: true
+  - type: input
+    id: ha
+    attributes:
+      label: Home-Assistant-Version
+      description: Einstellungen → Info, z. B. 2026.11
+  - type: textarea
+    id: ausstattung
+    attributes:
+      label: Ausstattung
+      description: Steckdosenleisten, Dosierer, KH-/ION-Director … soweit relevant
+  - type: textarea
+    id: log
+    attributes:
+      label: Protokoll
+      description: Einstellungen → Add-ons → Aquarium-Wächter → Protokoll (relevanter Ausschnitt)
+      render: text

@@ -35,6 +35,8 @@ class Bridge:
         mqtt.subscribe(f"{prefix}/+/leiste/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/+")
         mqtt.subscribe(f"{prefix}/_waechter/push/+/set")
+        mqtt.subscribe(f"{prefix}/_waechter/+/set")
+        self.commands_set = {}  # Name -> Funktion(payload) (Schalter/Zahlen des Wächters)
         self.notifier = None   # für die Schalter „Push an …“
         self.on_push = None
 
@@ -52,6 +54,9 @@ class Bridge:
         parts = topic.split("/")
         if len(parts) == 3 and parts[1] == "_waechter" and parts[2] in self.commands:
             self.commands[parts[2]]()
+            return
+        if len(parts) == 4 and parts[1] == "_waechter" and parts[3] == "set" and parts[2] in self.commands_set:
+            self.commands_set[parts[2]](payload)
             return
         if len(parts) == 5 and parts[1] == "_waechter" and parts[2] == "push" and parts[4] == "set":
             if self.notifier and parts[3] in self.notifier.phones and self.on_push:
@@ -141,6 +146,22 @@ class Bridge:
             "json_attributes_topic": f"{self.prefix}/_waechter/sammel/attr",
             "default_entity_id": "binary_sensor.aquarium_waechter_sammelstoerung",
             "availability_topic": self.avail, "device": dev})
+        self._conf("switch", "aquarium_waechter_wartung", {
+            "unique_id": "aquarium_waechter_wartung", "name": "Wartung – Alarme pausieren",
+            "icon": "mdi:wrench-clock",
+            "state_topic": f"{self.prefix}/_waechter/wartung",
+            "command_topic": f"{self.prefix}/_waechter/wartung/set",
+            "json_attributes_topic": f"{self.prefix}/_waechter/wartung/attr",
+            "default_entity_id": "switch.aquarium_waechter_wartung",
+            "availability_topic": self.avail, "device": dev})
+        self._conf("number", "aquarium_waechter_wartung_dauer", {
+            "unique_id": "aquarium_waechter_wartung_dauer", "name": "Wartung – Dauer",
+            "icon": "mdi:timer-outline", "min": 5, "max": 480, "step": 5, "mode": "box",
+            "unit_of_measurement": "min", "entity_category": "config",
+            "state_topic": f"{self.prefix}/_waechter/wartung_dauer",
+            "command_topic": f"{self.prefix}/_waechter/wartung_dauer/set",
+            "default_entity_id": "number.aquarium_waechter_wartung_dauer",
+            "availability_topic": self.avail, "device": dev})
         known = set(self.store_known("push"))
         if self.notifier:
             for phone in self.notifier.phones:
@@ -157,6 +178,14 @@ class Bridge:
             self.store_known("push", self.notifier.phones)
             self.publish_push()
         self._pub(self.avail, "online", retain=True)
+
+    def publish_maintenance(self, on, until, minutes):
+        self._pub(f"{self.prefix}/_waechter/wartung", "ON" if on else "OFF", retain=True)
+        self._pub(f"{self.prefix}/_waechter/wartung_dauer", str(minutes), retain=True)
+        bis = datetime.datetime.fromtimestamp(until).astimezone() if on else None
+        self._pub(f"{self.prefix}/_waechter/wartung/attr", {
+            "bis": bis.strftime("%H:%M") if bis else None,
+            "bis_iso": bis.isoformat() if bis else None}, retain=True)
 
     def publish_push(self):
         for phone in self.notifier.phones:

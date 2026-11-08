@@ -193,7 +193,8 @@ class DeviceWorker(threading.Thread):
             return
         now = time.time()
         self.unreachable_since = self.unreachable_since or now
-        if not self.unreachable_alerted and now - self.unreachable_since >= int(opts.get("nicht_erreichbar_nach", 600)):
+        if (not self.unreachable_alerted and not self.app.maintenance()
+                and now - self.unreachable_since >= int(opts.get("nicht_erreichbar_nach", 600))):
             self.unreachable_alerted = True
             self.notify("ProfiLux nicht erreichbar",
                         f"Seit {int((now - self.unreachable_since) / 60)} min keine Antwort von {self.host}.",
@@ -225,7 +226,9 @@ class DeviceWorker(threading.Thread):
                 f["detail"] = detail
                 delay = float(st.get("delay", 0)) * 60
                 every = REMINDER.get(it["kind"], reminder)
-                if not f["alerted"] and now - f["since"] >= delay:
+                if self.app.maintenance():
+                    pass  # Wartung: nichts melden; steht die Störung danach noch an, kommt der Alarm dann
+                elif not f["alerted"] and now - f["since"] >= delay:
                     f["alerted"], f["last"] = True, now
                     title = "Nachfüllen" if it["kind"] == "doser" else "STÖRUNG"
                     self.notify(f"{title}: {it['label']}", detail, urgent=it["kind"] != "doser")
@@ -262,6 +265,8 @@ class App:
         self.bridge = Bridge(self.mqtt)
         self.bridge.notifier = self.notifier
         self.bridge.on_push = self._push_changed
+        self.bridge.commands_set = {"wartung": self._set_maintenance,
+                                    "wartung_dauer": self._set_maintenance_minutes}
         self.dashboard_dirty = threading.Event()
         self.dashboard = Dashboard(HaWs(), self.data_dir / "dashboard.json") if opts.get("dashboard", True) else None
         self.bridge.commands["dashboard"] = lambda: self._dashboard(force=True)
@@ -287,6 +292,51 @@ class App:
                 faults.append((f"{w.name} · ProfiLux nicht erreichbar", f"keine Antwort von {w.host}"))
             faults += [(f"{w.name} · {label}", detail) for label, detail in w.active]
         self.bridge.summary("_waechter", faults)
+
+    # ---------------------------------------------------------------- Wartung
+    def maintenance(self):
+        return time.time() < float(self.store.data.get("wartung_bis") or 0)
+
+    def maintenance_minutes(self):
+        return int(self.store.data.get("wartung_dauer") or 30)
+
+    def _set_maintenance(self, raw):
+        on = str(raw).strip().upper() in ("ON", "TRUE", "1")
+        if on:
+            until = time.time() + self.maintenance_minutes() * 60
+            self.store.data["wartung_bis"] = until
+            self.store.save()
+            self.notifier.send("Wartung", f"Alarme pausiert bis {time.strftime('%H:%M', time.localtime(until))} "
+                               f"({self.maintenance_minutes()} min). Danach wird wieder überwacht.")
+        else:
+            self._end_maintenance(early=True)
+        self._publish_maintenance()
+
+    def _set_maintenance_minutes(self, raw):
+        try:
+            m = max(5, min(480, int(float(raw))))
+        except ValueError:
+            return
+        self.store.data["wartung_dauer"] = m
+        self.store.save()
+        self._publish_maintenance()
+
+    def _end_maintenance(self, early=False):
+        if not self.store.data.get("wartung_bis"):
+            return
+        self.store.data["wartung_bis"] = 0
+        self.store.save()
+        self.notifier.send("Wartung beendet", "Überwachung wieder aktiv." +
+                           (" Noch anstehende Störungen werden jetzt gemeldet." if not early else ""), kind="ok")
+        for w in self.workers:
+            w.wake.set()
+
+    def _publish_maintenance(self):
+        until = float(self.store.data.get("wartung_bis") or 0)
+        try:
+            self.bridge.publish_maintenance(self.maintenance(), until, self.maintenance_minutes())
+        except MqttError:
+            pass
 
     def _push_changed(self, phone, raw):
         on = self.store.set_push(phone, raw)
@@ -319,12 +369,16 @@ class App:
             self.bridge.announce_waechter()
         except MqttError:
             pass
+        self._publish_maintenance()
         for w in self.workers:
             w.start()
         if self.opts.get("start_meldung", False):
             self.notifier.send("Wächter gestartet", ", ".join(f"{w.name} ({w.host})" for w in self.workers))
         while True:
             self.mqtt.loop(5)
+            if self.store.data.get("wartung_bis") and not self.maintenance():
+                self._end_maintenance()
+                self._publish_maintenance()
             if self.dashboard_dirty.is_set() and all(w.inv.scanned for w in self.workers):
                 self.dashboard_dirty.clear()
                 self._dashboard()

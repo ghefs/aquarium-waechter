@@ -90,9 +90,17 @@ def build(workers):
     for dev in workers:
         uid, items = dev.uid, [it for it in dev.items if dev.settings.get(it["key"])["aktiv"]]
         e = lambda comp, suffix: f"{comp}.{uid}_{suffix}"
-        cards = [{"type": "grid", "columns": 2, "square": False, "cards": [
+        cards = [{"type": "grid", "columns": 3, "square": False, "cards": [
                      {"type": "tile", "entity": e("binary_sensor", "verbindung"), "name": "Verbindung"},
-                     {"type": "tile", "entity": e("binary_sensor", "sammelstoerung"), "name": "Sammelstörung"}]},
+                     {"type": "tile", "entity": e("binary_sensor", "sammelstoerung"), "name": "Sammelstörung"},
+                     {"type": "tile", "entity": "switch.aquarium_waechter_wartung", "name": "Wartung",
+                      "tap_action": {"action": "toggle"}}]},
+                 {"type": "conditional",
+                  "conditions": [{"condition": "state", "entity": "switch.aquarium_waechter_wartung", "state": "on"}],
+                  "card": {"type": "markdown", "content":
+                           "🔧 **Wartung – Alarme pausiert bis "
+                           "{{ state_attr('switch.aquarium_waechter_wartung', 'bis') }}.** "
+                           "Danach wird wieder überwacht; anstehende Störungen kommen dann."}},
                  {"type": "markdown", "title": "Störungen", "content": _md_faults(uid)}]
         values = [it for it in items if it["kind"] == "value"]
         if values:
@@ -198,6 +206,15 @@ def build(workers):
             {"type": "entities", "entities": ["button.aquarium_waechter_dashboard_neu",
                                               "button.aquarium_waechter_telegram_test",
                                               "button.aquarium_waechter_neu_einlesen"]}]})
+        sections.append({"type": "grid", "cards": [
+            {"type": "heading", "heading": "Wartung"},
+            {"type": "markdown", "content": (
+                "Am Becken arbeiten (Pumpe reinigen, Sonde kalibrieren …)? **Wartung** einschalten – "
+                "dann kommen für die eingestellte Dauer **keine Alarme**. Danach schaltet sie sich "
+                "selbst ab; steht eine Störung dann noch an, wird sie gemeldet. "
+                "Der Wächter schaltet dabei am ProfiLux nichts.")},
+            {"type": "entities", "state_color": True, "entities": [
+                "switch.aquarium_waechter_wartung", "number.aquarium_waechter_wartung_dauer"]}]})
         phones = workers[0].app.notifier.phones if workers else []
         if phones:
             sections.append({"type": "grid", "cards": [

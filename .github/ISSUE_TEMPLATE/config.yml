@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Wiki – Anleitung und Fehlersuche
+    url: https://github.com/ghefs/aquarium-waechter/wiki/Fehlersuche
+    about: Viele Fragen sind dort schon beantwortet.

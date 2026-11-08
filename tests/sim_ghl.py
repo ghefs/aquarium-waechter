@@ -60,6 +60,8 @@ def answer(cmd, p):
         return {"DESCRIPTION": txt(d), "FILLLEVEL": num(ml), "CAPACITY": num(1700.0)}.get(attr, "NACK (-5)")
     if obj == "ILLUMINATION" and i < 16 and m[2] is not None:
         d, v = p.get("lights", {}).get(i, ("", 0.0))
+        if attr == "POINTCOUNT":  # erst ab FW 7.52; benannte Kanäle haben eine Kurve
+            return num(5 if d else 0) if p.get("fw752") else "NACK (-5)"
         return {"DESCRIPTION": txt(d), "ACTBRIGHTNESS": num(v)}.get(attr, "NACK (-5)")
     if obj == "KHDIRECTOR" and p["kh"]:
         t = int(time.time() - 3 * 3600)

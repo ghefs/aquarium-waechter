@@ -3,6 +3,16 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.3.0
+
+- **Wartungsmodus**: Schalter „Wartung – Alarme pausieren“ (Übersicht und Einstellungsseite),
+  Dauer einstellbar (Standard 30 min). Während der Wartung kommen keine Alarme; danach
+  schaltet sie sich selbst ab, noch anstehende Störungen werden dann gemeldet.
+  Meldung bei Beginn und Ende; `/aq` zeigt die laufende Wartung an
+  (Blueprint „Telegram-Befehle“ dafür neu importieren).
+- **Licht:** Kanäle ohne Lichtkurve werden nicht mehr angelegt (ab Firmware 7.52).
+- Formulare für Fehlermeldungen und Funktionswünsche auf GitHub.
+
 ## 4.2.2
 
 - Einstellung „Alarm per Telegram“ heißt jetzt **„Alarm melden“** (gilt für Push an die
