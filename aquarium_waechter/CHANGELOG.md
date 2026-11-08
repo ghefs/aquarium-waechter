@@ -10,6 +10,8 @@ Vor jedem Update empfiehlt sich ein Backup von Home Assistant
   Attribute `anzahl`, `stoerungen`, `text`. Für eigene Automationen (Lampe, Sirene, Ansage …).
 - Einstellungsseite: „So wird überwacht“ als gut lesbarer Kasten über jedem Block
   (statt abgeschnittener Zeile je Teil).
+- **Fehler behoben:** Mit ausgewählten Steckdosenleisten startete 4.1.1 nach einem
+  Neustart nicht mehr richtig („unerwarteter Fehler“ im Protokoll). Bitte aktualisieren.
 
 ## 4.1.1
 
