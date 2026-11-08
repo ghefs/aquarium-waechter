@@ -329,12 +329,35 @@ Mit `dashboard: false` ist die Automatik ganz aus.
 
 ## Telegram
 
-1. Bei **@BotFather** einen Bot anlegen (`/newbot`), Token notieren.
-2. Bot in die gewünschte Gruppe einladen, dort eine Nachricht schreiben.
-3. In HA die Integration **Telegram bot** einrichten (Token eintragen, Polling) und
-   die Gruppe als erlaubten Chat hinzufügen – dabei wird die Chat-ID angezeigt
-   (Gruppen beginnen mit `-`).
-4. Chat-ID in der Add-on-Konfiguration bei `telegram_chat_id` eintragen.
+Meldungen gehen an eine **Gruppe** (praktisch, wenn mehrere Leute Bescheid wissen
+sollen) oder an **einzelne Personen** – oder an beides, mehrere IDs mit Komma:
+`-1234567890, 987654321`.
+
+1. In Telegram **@BotFather** öffnen, `/newbot` senden, Namen vergeben → **Token**
+   notieren (sieht aus wie `123456:ABC-…`, geheim halten).
+2. Den Bot anschreiben:
+   - **Gruppe:** Bot in die Gruppe einladen und dort eine beliebige Nachricht schreiben.
+   - **Einzelchat:** den Bot suchen, **Start** drücken und eine Nachricht schreiben
+     (ein Bot darf niemanden von sich aus anschreiben).
+3. **Chat-ID herausfinden:** im Browser
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` öffnen (`<TOKEN>` ersetzen) und
+   nach `"chat":{"id":` suchen – die Zahl dahinter ist die Chat-ID.
+   Erscheint nur `"result":[]`, noch einmal eine Nachricht schreiben und neu laden.
+   *(Das klappt nur, solange die Telegram-Integration in HA noch nicht läuft – sie
+   holt die Nachrichten sonst vorher ab. Dann vorübergehend deaktivieren.)*
+
+   | Chat-ID | bedeutet |
+   |---|---|
+   | `987654321` (positiv) | Einzelchat mit einer Person |
+   | `-1234567890` | Gruppe |
+   | `-100…` | Supergruppe / Kanal |
+
+   Wird eine Gruppe später zur Supergruppe (passiert automatisch, z. B. beim Vergeben
+   von Admin-Rechten), ändert sich die ID – dann kommt der Telegram-Test nicht mehr an
+   und die neue ID muss eingetragen werden.
+4. In HA die Integration **Telegram bot** einrichten (Token, „Polling“) und die
+   Chat-ID als erlaubten Chat hinzufügen.
+5. Chat-ID in der Add-on-Konfiguration bei `telegram_chat_id` eintragen.
 
 Den Token liest das Add-on aus der Telegram-Integration – er muss nur dort gepflegt
 werden. Ohne Integration: Token unter `telegram_token` eintragen.

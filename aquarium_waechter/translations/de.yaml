@@ -10,7 +10,7 @@ configuration:
       unbenannte_abfragen: auch Teile ohne Namen auslesen.
   telegram_chat_id:
     name: Telegram-Chat-ID
-    description: Gruppe/Chat für Alarme (mehrere mit Komma). Leer = nur Log.
+    description: Wohin die Alarme gehen – Gruppe (beginnt mit -) oder Einzelchat (positive Zahl), mehrere mit Komma. Wie man die ID findet, steht in der Anleitung unter „Telegram“. Leer = nur Log.
   telegram_token:
     name: Telegram-Bot-Token
     description: Leer lassen, wenn die Telegram-Integration in HA eingerichtet ist – dann wird deren Token benutzt.
