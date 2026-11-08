@@ -23,6 +23,10 @@ wenn Home Assistant selbst gerade hängt.
 > um zu beschreiben, mit welchen Geräten das Add-on funktioniert.
 > Ausgänge werden nur gelesen, niemals geschaltet.
 
+> ⚠️ **Nutzung auf eigene Gefahr – siehe [Haftungsausschluss](#haftungsausschluss).**
+> Der Wächter ist eine zusätzliche Überwachung und **kein Ersatz** für die
+> Schutzfunktionen des ProfiLux und unabhängige Sicherungen am Becken.
+
 **→ Direkt zur [Installation](#installation)**
 
 ## Voraussetzungen
@@ -82,6 +86,15 @@ mqtt_password: geheim
 > **Voraussetzung:** Home Assistant **OS** (oder „Supervised“) – nur dort gibt es
 > Add-ons. Bei Home Assistant „Container“ oder „Core“ fehlt der Add-on-Store.
 > Prüfen: *Einstellungen → System → Info* → „Installationsart“.
+
+### Schritt 0 – Backup erstellen
+
+Vor der Installation (und vor größeren Updates) eine Sicherung von Home Assistant
+anlegen: *Einstellungen → System → Backups → **Backup erstellen*** (vollständiges
+Backup). Damit lässt sich der vorherige Zustand jederzeit wiederherstellen.
+
+Das Add-on legt eigene Geräte, Entitäten und ein Dashboard an, ändert aber keine
+bestehende Konfiguration. Trotzdem gilt: erst sichern, dann installieren.
 
 ### Schritt 1 – Repository hinzufügen
 
@@ -153,6 +166,7 @@ Jetzt auf der Einstellungsseite festlegen, was überwacht wird
 
 Neue Versionen erscheinen in Home Assistant wie bei jedem Add-on unter
 *Einstellungen* (Update-Hinweis) → **Aktualisieren**. Einstellungen bleiben erhalten.
+Beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen.
 
 ### Deinstallieren
 
@@ -320,6 +334,27 @@ GHL-API-Kurzreferenz: Klartext über TCP 10002, `GET SWITCHCHANNEL[n] ACTSTATE`,
 `… ACTCURRENT`, `… DESCRIPTION`, `GET SENSOR[n] ACTVALUE[u]`, `GET DOSER[n] FILLLEVEL`,
 `GET KHDIRECTOR ACTVALUE`, `GET KHDIRECTOR DATARECORD[0]` (Zeit der letzten Messung).
 Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
+
+## Haftungsausschluss
+
+Dieses Projekt wird **ohne jede Gewährleistung** bereitgestellt und die Nutzung
+erfolgt **auf eigene Gefahr**. Für Schäden jeglicher Art – insbesondere an Tieren,
+Pflanzen, Aquarium, Technik, Gebäude oder Daten, für Folgeschäden sowie für
+ausgebliebene, verspätete oder falsche Meldungen – wird **keine Haftung**
+übernommen, soweit gesetzlich zulässig.
+
+Bitte beachten:
+- Eine Überwachung kann ausfallen: Stromausfall, WLAN/Netzwerk, Home Assistant,
+  Telegram, Internet, Firmware-Updates des ProfiLux (GHL-API danach wieder aus) usw.
+  Ausbleibende Meldungen bedeuten **nicht**, dass alles in Ordnung ist.
+- Der Wächter ersetzt **keine** Schutzeinrichtungen: Heizstab mit eigenem
+  Thermostat, Niveau-/Überlaufschutz, Fehlerstrom-Schutzschalter, Rauchmelder,
+  regelmäßige Sichtkontrolle.
+- Grenzwerte und Einstellungen liegen in der Verantwortung des Nutzers.
+- Vor Installation und Updates ein Backup von Home Assistant erstellen.
+
+Rechtlich maßgeblich ist die [MIT-Lizenz](LICENSE) („THE SOFTWARE IS PROVIDED
+"AS IS", WITHOUT WARRANTY OF ANY KIND …“).
 
 ## Stichworte
 

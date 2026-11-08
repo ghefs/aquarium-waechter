@@ -1,7 +1,7 @@
 name: Aquarium-Wächter
 version: "4.0.3"
 slug: aquarium_waechter
-description: Überwacht GHL ProfiLux 4 Aquariencomputer – Werte in Home Assistant, Alarme per Telegram
+description: Überwacht GHL ProfiLux 4 Aquariencomputer – Werte in Home Assistant, Alarme per Telegram. Nutzung auf eigene Gefahr, vorher Backup erstellen.
 url: https://github.com/ghefs/aquarium-waechter
 arch: [aarch64, amd64]
 init: false
