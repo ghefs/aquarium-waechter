@@ -3,6 +3,10 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.3.6
+
+- Einstellungsseite: Hinweis bei „Bereiche“, dass das Neueinlesen nach dem Umschalten 1–3 Minuten dauern kann.
+
 ## 4.3.5
 
 - **Fehler behoben:** Das Dashboard wurde nach Änderungen (z. B. Bereich „Licht“ aus) nicht

@@ -167,6 +167,9 @@ def build(workers):
                 {"entity": e("select", f"leiste_{n}")}
                 for n in range(1, min(MAX_STRIPS, len(dev.leisten()) + 1) + 1)]},
             {"type": "heading", "heading": "Bereiche", "heading_style": "subtitle"},
+            {"type": "markdown", "content": (
+                "Nach dem Ein- oder Ausschalten liest das Add-on den ProfiLux neu ein – das kann "
+                "**1–3 Minuten** dauern. Danach die Seite neu laden.")},
             {"type": "entities", "state_color": True, "entities": [
                 {"entity": e("switch", f"bereich_{cat}"), "name": name}
                 for cat, name in CATEGORY_NAMES.items()]}]}]
