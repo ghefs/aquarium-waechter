@@ -1,5 +1,5 @@
 name: Aquarium-Wächter
-version: "4.0.2"
+version: "4.0.3"
 slug: aquarium_waechter
 description: Überwacht GHL ProfiLux 4 Aquariencomputer – Werte in Home Assistant, Alarme per Telegram
 url: https://github.com/ghefs/aquarium-waechter
@@ -40,4 +40,8 @@ schema:
   rescan: int(300,86400)?
   dashboard: bool
   start_meldung: bool?
+  mqtt_host: str?
+  mqtt_port: port?
+  mqtt_user: str?
+  mqtt_password: password?
   debug: bool?

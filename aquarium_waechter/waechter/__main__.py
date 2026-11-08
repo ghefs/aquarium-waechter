@@ -197,11 +197,12 @@ class App:
         self.data_dir = Path(data_dir)
         self.store = SettingsStore(self.data_dir / "einstellungen.json")
         self.notifier = Notifier(opts.get("telegram_chat_id"), opts.get("telegram_token") or None)
-        m = opts.get("mqtt") or {}
-        self.mqtt = Mqtt(m.get("host") or os.environ.get("MQTT_HOST", "core-mosquitto"),
-                         int(m.get("port") or os.environ.get("MQTT_PORT", 1883)),
-                         m.get("user") or os.environ.get("MQTT_USER"),
-                         m.get("password") or os.environ.get("MQTT_PASSWORD"),
+        # Externer Broker (Optionen mqtt_*) hat Vorrang vor dem Mosquitto-Add-on
+        m = {k: opts.get(f"mqtt_{k}") or (opts.get("mqtt") or {}).get(k) for k in ("host", "port", "user", "password")}
+        self.mqtt = Mqtt(m["host"] or os.environ.get("MQTT_HOST", "core-mosquitto"),
+                         int(m["port"] or os.environ.get("MQTT_PORT", 1883)),
+                         (m["user"] if m["host"] else None) or os.environ.get("MQTT_USER"),
+                         (m["password"] if m["host"] else None) or os.environ.get("MQTT_PASSWORD"),
                          will=("aquarium/status", "offline"))
         self.bridge = Bridge(self.mqtt)
         self.dashboard_dirty = threading.Event()

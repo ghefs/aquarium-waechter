@@ -1,4 +1,4 @@
 {"geraete":[{"name":"Quarantäne","host":"127.0.0.1","port":19001},
             {"name":"Riff","host":"127.0.0.1","port":19002}],
  "telegram_chat_id":"","intervall":20,"dashboard":false,
- "mqtt":{"host":"127.0.0.1","port":19883}}
+ "mqtt_host":"127.0.0.1","mqtt_port":19883}

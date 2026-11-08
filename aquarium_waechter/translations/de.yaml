@@ -25,5 +25,14 @@ configuration:
     description: Eigenes Dashboard „Aquarium“. Handänderungen werden erkannt und nicht überschrieben.
   start_meldung:
     name: Telegram-Meldung beim Start
+  mqtt_host:
+    name: Externer MQTT-Broker (Host)
+    description: Nur ausfüllen, wenn NICHT das Mosquitto-Add-on benutzt wird.
+  mqtt_port:
+    name: Externer MQTT-Broker (Port)
+  mqtt_user:
+    name: Externer MQTT-Broker (Benutzer)
+  mqtt_password:
+    name: Externer MQTT-Broker (Passwort)
   debug:
     name: Ausführliches Log

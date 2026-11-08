@@ -55,14 +55,24 @@ Zugang automatisch vom Supervisor. Ein bereits vorhandener Mosquitto (z. B. für
 Zigbee2MQTT) wird einfach mitbenutzt.
 
 Nur wer einen **externen** Broker verwenden will (kein Mosquitto-Add-on), trägt ihn
-in der Add-on-Konfiguration im YAML-Modus ein:
+in HA unter *Einstellungen → Add-ons → Aquarium-Wächter → Konfiguration* ein.
+Die Felder erscheinen nach Klick auf **„Nicht verwendete optionale
+Konfigurationsoptionen anzeigen“**:
+
+| Feld | Beispiel |
+|---|---|
+| Externer MQTT-Broker (Host) | `192.168.1.10` |
+| Externer MQTT-Broker (Port) | `1883` |
+| Externer MQTT-Broker (Benutzer) | `aquarium` |
+| Externer MQTT-Broker (Passwort) | `geheim` |
+
+Alternativ im selben Reiter über *⋮ → Als YAML bearbeiten*:
 
 ```yaml
-mqtt:
-  host: 192.168.1.10
-  port: 1883
-  user: aquarium
-  password: geheim
+mqtt_host: 192.168.1.10
+mqtt_port: 1883
+mqtt_user: aquarium
+mqtt_password: geheim
 ```
 
 ## Installation
@@ -70,7 +80,8 @@ mqtt:
 1. *Einstellungen → Add-ons → Add-on-Store* → ⋮ → **Repositories** →
    `https://github.com/ghefs/aquarium-waechter` hinzufügen.
 2. **Aquarium-Wächter** installieren.
-3. Reiter **Konfiguration** – Geräte eintragen:
+3. Reiter **Konfiguration** – Geräte eintragen (am einfachsten über *⋮ → Als YAML
+   bearbeiten*):
 
    ```yaml
    geraete:
