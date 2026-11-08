@@ -3,6 +3,11 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.2.1
+
+- Reiter **Dokumentation** im Add-on mit Kurzanleitung.
+- ☕ Hinweis „Projekt unterstützen“ in README, Dokumentation und auf der Einstellungsseite.
+
 ## 4.2.0
 
 - **Push an die Home-Assistant-App** (iPhone/Android): Das Add-on findet alle Handys

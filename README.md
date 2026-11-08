@@ -6,6 +6,12 @@ Alle Werte in Home Assistant, Überwachung von Pumpen, Sonden, KH-Director und
 Dosierern – und ein **Alarm aufs Handy, der auch nachts im Stumm-Modus klingelt**,
 bevor aus einer ausgefallenen Pumpe ein Notfall wird.
 
+> ☕ **Der Wächter ist kostenlos – und soll es bleiben.** Wenn er dir eine schlaflose
+> Nacht oder sogar ein Becken erspart, spendier mir einen Kaffee. Das hält das Projekt
+> am Leben und finanziert neue Funktionen.
+>
+> <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
+
 > 🇬🇧 *Take your aquarium to the next level: Home Assistant add-on that monitors GHL ProfiLux 4
 > aquarium controllers and sends critical push (HA app) or Telegram alarms when a pump stops, a probe fails, the KH Director stops measuring or a
 > dosing container runs low. Documentation is in German – the add-on works worldwide.*
@@ -55,9 +61,7 @@ Genau diese Lücke schließt der Wächter:
 > Der Wächter ist eine zusätzliche Überwachung und **kein Ersatz** für die
 > Schutzfunktionen des ProfiLux und unabhängige Sicherungen am Becken.
 
-**→ Direkt zur [Installation](#installation)**
-
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gutgeschaltet)
+**→ Direkt zur [Installation](#installation)** · ☕ [Projekt unterstützen](#unterstützen)
 
 ## Voraussetzungen
 
@@ -535,10 +539,11 @@ Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
 
 ## Unterstützen
 
-Der Wächter ist kostenlos und bleibt es. Wenn er dir hilft – oder vielleicht sogar
+Der Wächter ist kostenlos und bleibt es. Hinter jeder Version stecken viele Abende
+Entwicklung und Tests am echten Becken. Wenn er dir hilft – oder vielleicht sogar
 ein Becken gerettet hat – freue ich mich über einen Kaffee:
 
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gutgeschaltet)
+<a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
 
 Genauso wertvoll: ⭐ für das Repo, Fehler melden und Erfahrungen mit anderen
 ProfiLux-Ausstattungen teilen (Issues).

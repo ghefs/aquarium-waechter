@@ -191,7 +191,10 @@ def build(workers):
                 "Dieses Dashboard erzeugt der Aquarium-Wächter automatisch. "
                 "**Änderungen von Hand** werden erkannt und dann nicht mehr überschrieben – "
                 "für eigene Anpassungen das Dashboard besser kopieren. "
-                "Mit dem Knopf unten wird es neu erzeugt (Handänderungen gehen verloren).")},
+                "Mit dem Knopf unten wird es neu erzeugt (Handänderungen gehen verloren).\n\n"
+                "☕ **Der Wächter ist kostenlos.** Gefällt er dir? "
+                "[Spendier mir einen Kaffee](https://buymeacoffee.com/gutgeschaltet) · "
+                "[⭐ auf GitHub](https://github.com/ghefs/aquarium-waechter)")},
             {"type": "entities", "entities": ["button.aquarium_waechter_dashboard_neu",
                                               "button.aquarium_waechter_telegram_test",
                                               "button.aquarium_waechter_neu_einlesen"]}]})
