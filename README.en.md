@@ -114,6 +114,26 @@ with updates, bug fixes and adjustments to new firmware.
 | Geräte neu einlesen | rescan devices |
 | Nachfüllen | refill |
 
+## To the GHL team 👋
+
+Thank you for the open GHL API – without it this project would not exist. The add-on
+uses **only the official API**, read-only. Some information shown in GHL Connect is
+not (yet) available via the API. It would be great to have:
+
+1. **Power bars:** which bar (PAB, STDL …) a socket belongs to
+2. **ProfiLux alarm list:** active alarms and messages as in GHL Connect
+3. **Maintenance and feed pause:** read the state (active? how long left?)
+4. **Sensor type and units:** pH, ORP, temperature …; unit of flow sensors
+5. **ION Director:** names of the measured values (Ca, Mg …)
+6. **Dosing pumps:** configured dosing amounts and times
+7. **Timers and pumps:** switching times and current flow programs
+8. **Power/mains monitoring:** its measured values, where available
+9. **Multiple clients at once** – e.g. Home Assistant plus another tool
+10. *Later:* optional **write access with authentication**, e.g. start maintenance from Home Assistant
+
+I'm happy to test new firmware with such extensions on real tanks – contact via the
+[issues](https://github.com/ghefs/aquarium-waechter/issues).
+
 ## Support the project
 
 The add-on is free and will stay free. Every version means many evenings of

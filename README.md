@@ -142,6 +142,27 @@ GHL-API-Kurzreferenz: Klartext über TCP 10002, `GET SWITCHCHANNEL[n] ACTSTATE`,
 `GET KHDIRECTOR ACTVALUE`, `GET KHDIRECTOR DATARECORD[0]` (Zeit der letzten Messung).
 Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
 
+## An das GHL-Team 👋
+
+Danke für die offene GHL-API – ohne sie gäbe es dieses Projekt nicht. Das Add-on nutzt
+**ausschließlich die offizielle API** und greift nur lesend zu. Einige Informationen,
+die GHL Connect anzeigt, sind über die API (noch) nicht abrufbar. Schön wäre:
+
+1. **Steckdosenleisten:** zu welcher Leiste (PAB, STDL …) eine Steckdose gehört
+2. **Alarmliste des ProfiLux:** aktive Alarme und Meldungen wie in GHL Connect
+3. **Wartung und Futterpause:** Zustand lesen (aktiv? wie lange noch?)
+4. **Sensor-Art und Einheiten:** pH, Redox, Temperatur …; Einheit beim Durchfluss
+5. **ION-Director:** Bezeichnung der Messwerte (Ca, Mg …)
+6. **Dosierer:** eingestellte Dosiermengen und -zeiten
+7. **Timer und Pumpen:** Schaltzeiten und aktuelle Strömungsprogramme
+8. **Strom- und Netzüberwachung:** deren Messwerte, sofern vorhanden
+9. **Mehrere Clients gleichzeitig** – z. B. Home Assistant und ein weiteres Tool
+10. *Später:* optionaler **Schreibzugriff mit Anmeldung**, z. B. Wartung aus Home Assistant starten
+
+Neue Firmware mit solchen Erweiterungen teste ich gern an echten Becken – Kontakt
+über die [Issues](https://github.com/ghefs/aquarium-waechter/issues).
+Was heute schon geht: [Was wird ausgelesen?](https://github.com/ghefs/aquarium-waechter/wiki/Was-wird-ausgelesen)
+
 ## Unterstützen
 
 Das Add-on ist kostenlos und bleibt es. Hinter jeder Version stecken viele Abende
