@@ -112,8 +112,8 @@ Danach die Seite neu laden (⋮ → Nach Updates suchen).
 ### Schritt 2 – Add-on installieren
 
 Im Add-on-Store erscheint der Abschnitt **Aquarium-Wächter** → Add-on anklicken →
-**Installieren**. Die erste Installation dauert ein paar Minuten (das Add-on wird
-auf dem eigenen Rechner gebaut).
+**Installieren**. Das fertige Add-on wird von GitHub geladen, das dauert meist
+weniger als eine Minute.
 
 ### Schritt 3 – MQTT
 
@@ -322,6 +322,11 @@ Import: Knopf in [Schritt 6](#schritt-6--optional-telegram-befehle-und-shelly) o
 `https://github.com/ghefs/aquarium-waechter/blob/main/blueprints/automation/aquarium_waechter/shelly_geraet_ueberwachen.yaml`
 
 ## Entwicklung
+
+Bei jedem Push auf `main`, der den Ordner `aquarium_waechter/` ändert, baut GitHub
+Actions die Images `ghcr.io/ghefs/{aarch64,amd64}-aquarium-waechter:<version>`.
+Neue Version: `version` in `config.yaml` erhöhen, Eintrag in `CHANGELOG.md`, pushen –
+nach ca. 3 Minuten steht das Update bereit.
 
 Nur Python-Standardbibliothek. Lokal testen mit Simulatoren:
 

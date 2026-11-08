@@ -3,6 +3,12 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.0.4
+
+- Das Add-on wird jetzt fertig gebaut von GitHub geladen (ghcr.io) statt auf dem
+  eigenen Rechner gebaut – Installation und Updates gehen deutlich schneller.
+  Keine Änderung an Funktionen oder Einstellungen.
+
 ## 4.0.3
 
 - Externer MQTT-Broker: eigene Optionen `mqtt_host`, `mqtt_port`, `mqtt_user`,
