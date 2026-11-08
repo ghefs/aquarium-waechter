@@ -1,0 +1,69 @@
+# Baut das Add-on für jede Architektur und legt es als fertiges Image in die
+# GitHub Container Registry (ghcr.io/ghefs/<arch>-aquarium-waechter:<version>).
+# Home Assistant lädt dann das fertige Image statt selbst zu bauen.
+name: Add-on bauen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "aquarium_waechter/**"
+      - ".github/workflows/build.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            platform: linux/arm64
+          - arch: amd64
+            platform: linux/amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version und Basis-Image lesen
+        id: info
+        run: |
+          version=$(sed -nE 's/^version: *"?([^"]+)"?.*/\1/p' aquarium_waechter/config.yaml)
+          from=$(sed -nE 's/^ *${{ matrix.arch }}: *(.+)$/\1/p' aquarium_waechter/build.yaml)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          echo "Version $version, Basis $from"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: aquarium_waechter
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            BUILD_FROM=${{ steps.info.outputs.from }}
+            BUILD_ARCH=${{ matrix.arch }}
+            BUILD_VERSION=${{ steps.info.outputs.version }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-aquarium-waechter:${{ steps.info.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-aquarium-waechter:latest
+          labels: |
+            io.hass.type=addon
+            io.hass.name=Aquarium-Wächter
+            io.hass.arch=${{ matrix.arch }}
+            io.hass.version=${{ steps.info.outputs.version }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Home-Assistant-Add-on für GHL ProfiLux 4
+            org.opencontainers.image.licenses=MIT
