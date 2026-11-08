@@ -29,6 +29,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: YAML prüfen (sonst kann HA das Add-on nicht lesen)
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in ["repository.yaml", *glob.glob("aquarium_waechter/*.yaml"),
+                    *glob.glob("aquarium_waechter/translations/*.yaml")]:
+              try:
+                  yaml.safe_load(open(f, encoding="utf-8"))
+              except Exception as e:
+                  print(f"::error file={f}::{e}"); bad = 1
+          cfg = yaml.safe_load(open("aquarium_waechter/config.yaml", encoding="utf-8"))
+          for k in ("name", "version", "slug", "description", "arch"):
+              if not isinstance(cfg.get(k), (str, list)):
+                  print(f"::error file=aquarium_waechter/config.yaml::'{k}' fehlt oder ist kein Text"); bad = 1
+          sys.exit(bad)
+          PY
+
       - name: Version und Basis-Image lesen
         id: info
         run: |

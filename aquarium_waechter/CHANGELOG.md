@@ -12,6 +12,9 @@ Vor jedem Update empfiehlt sich ein Backup von Home Assistant
   (Blueprint „Telegram-Befehle“ dafür neu importieren).
 - **Licht:** Kanäle ohne Lichtkurve werden nicht mehr angelegt (ab Firmware 7.52).
 - Formulare für Fehlermeldungen und Funktionswünsche auf GitHub.
+- **Fehler behoben:** Seit 4.2.1 war die Add-on-Beschreibung fehlerhaft formatiert – Home
+  Assistant zeigte deshalb keine Updates an. Wer noch 4.2.0 hat: im Add-on-Store
+  *⋮ → Nach Updates suchen*, dann aktualisieren.
 
 ## 4.2.2
 
