@@ -3,7 +3,7 @@ version: "4.5.0"
 slug: aquarium_waechter
 # Fertige Images von GitHub Actions (.github/workflows/build.yaml); ohne diese Zeile baut HA selbst
 image: ghcr.io/ghefs/{arch}-aquarium-waechter
-description: "Bring dein Aquarium auf das nächste Level: überwacht GHL ProfiLux 4 Aquariencomputer – Werte in Home Assistant, Alarme per Telegram und HA-App. Nutzung auf eigene Gefahr, vorher Backup erstellen."
+description: "GHL ProfiLux 4 in Home Assistant: values, monitoring, push/Telegram alarms, weekly report – in de/en/fr/es/it. Werte, Überwachung, Alarme aufs Handy. Use at your own risk, make a backup first."
 url: https://github.com/ghefs/aquarium-waechter
 arch: [aarch64, amd64]
 init: false

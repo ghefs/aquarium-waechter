@@ -14,8 +14,9 @@ before a failed pump turns into an emergency.
 >
 > <a href="https://buymeacoffee.com/gutgeschaltet"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=gutgeschaltet&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="50"></a>
 
-> **Language note:** The dashboard, settings page and alarm messages are currently
-> in **German**. The add-on works with any ProfiLux 4 worldwide; the detailed
+> 🌍 **Speaks your language:** dashboard, entities, settings and alarm messages in
+> **English, Deutsch, Français, Español and Italiano** – automatically in the language of
+> your Home Assistant (option `sprache` to fix it). The detailed
 > [wiki](https://github.com/ghefs/aquarium-waechter/wiki) is in German (your browser
 > can translate it). Questions in English are welcome in the issues.
 
@@ -178,7 +179,9 @@ Legally binding is the [MIT license](LICENSE).
 
 GHL ProfiLux 4, ProfiLux 3, GHL Connect, aquarium controller, reef tank, saltwater
 aquarium, marine aquarium, KH Director, doser, dosing pump, Home Assistant add-on,
-MQTT, Telegram, pump monitoring, aquarium alarm, critical notification
+MQTT, Telegram, pump monitoring, aquarium alarm, critical notification, Shelly Plug S,
+smart plug monitoring, dosing container forecast, weekly report, aquarium energy consumption,
+contrôleur d'aquarium, controlador de acuario, controller acquario
 
 ## License
 
