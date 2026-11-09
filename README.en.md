@@ -32,6 +32,12 @@ phone (HA companion app and/or Telegram):
   pump stopped (current too low), temperature out of range, dosing container almost
   empty, no KH measurement any more, ProfiLux unreachable. With delay against false
   alarms, reminders and an “OK again” message.
+- **Monitor Home Assistant smart plugs too:** an extra pump or external light on a
+  **Shelly Plug S** (or any other plug with power metering)? Switch it on in the settings
+  page – it shows up in the dashboard and is monitored like a ProfiLux socket (power too
+  low/too high, unreachable).
+- **Weekly report** to your phone: mean/min/max of all readings, consumption and supply
+  of the dosing containers, faults of the week.
 - **Maintenance mode:** one switch pauses all alarms while you work on the tank;
   it switches itself off after the set time.
 - **Everything configurable in HA:** what is read, what is monitored, limits.
@@ -55,7 +61,9 @@ That gap is what this add-on closes:
 - **KH Director:** no measurement for hours (reagent empty, tube clogged)? → alarm.
   From firmware 7.52 also leak and measuring-range alarms.
 - **Probe errors:** probe no longer delivers a valid value? → alarm (firmware 7.52+).
-- **Dosing containers:** “refill” warning in time, in ml and %.
+- **Dosing containers:** consumption per day and **“lasts another … days”** – the
+  “refill” message comes in time, before the container runs dry. From firmware 7.52 also
+  the **last dose** (time and ml).
 - **ProfiLux gone** (power cut, Wi-Fi, API off after a firmware update)? → alarm.
 
 **Actively maintained:** I look after aquariums with a ProfiLux myself and use this add-on

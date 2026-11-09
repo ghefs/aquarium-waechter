@@ -15,10 +15,13 @@ from pathlib import Path
 
 from .bridge import Bridge
 from .dashboard import Dashboard
+from .extern import HaPlugs
+from .forecast import Forecast
 from .ghl import GhlClient, Inventory, ReadError, strips_from_choice
 from .haws import HaWs
 from .mqtt import Mqtt, MqttError
 from .notify import Notifier
+from . import report
 from .settings import REMINDER, SettingsStore, evaluate, fmt
 
 log = logging.getLogger("waechter")
@@ -52,12 +55,17 @@ class DeviceWorker(threading.Thread):
         self.unreachable_alerted = False
         self.active = []  # gemeldete Störungen [(Bezeichnung, Detail)] -> Sammelstörung
         self.last_values = {}
+        self.dose_rate = {}  # key -> (ml/Tag, Zeitpunkt der Berechnung) aus dem Dosierprotokoll
         self._sig = None
         self.force_scan = False
 
     # vom Bridge aufgerufen
+    def all_items(self):
+        """Teile des ProfiLux + zugeordnete Steckdosen aus Home Assistant."""
+        return self.inv.items(self.settings) + self.app.plugs.items_for(self.uid)
+
     def items_changed(self):
-        self.items = self.inv.items(self.settings)
+        self.items = self.all_items()
         self.announced = False
         self.app.dashboard_dirty.set()
         self.wake.set()
@@ -99,7 +107,7 @@ class DeviceWorker(threading.Thread):
     def scan(self):
         self.inv.scan()
         self.settings.named = {}
-        self.items = self.inv.items(self.settings)
+        self.items = self.all_items()
         for it in self.items:
             self.settings.named[it["key"]] = it["named"]
         self.check_renames()
@@ -139,6 +147,7 @@ class DeviceWorker(threading.Thread):
         last_scan = 0
         while True:
             start = time.time()
+            plugs = {}
             self.ghl.new_round()
             try:
                 if not self.inv.scanned or self.force_scan or time.time() - last_scan > rescan:
@@ -148,16 +157,23 @@ class DeviceWorker(threading.Thread):
                 if not self.announced:
                     self.app.bridge.announce(self)
                     self.announced = True
+                plugs = self.app.plugs.read(self.items)
                 values = self.inv.read(self.items, self.settings)
                 if self.ghl.down:
                     raise ReadError(self.ghl.down)
                 self.reachable(True)
+                values.update(plugs)
+                self.add_forecast(values)
                 self.last_values = values
                 self.app.bridge.values(self, values)
                 self.check(values)
             except ReadError as e:
                 log.info("%s: nicht erreichbar: %s", self.name, e)
                 self.reachable(False)
+                try:
+                    self.check(plugs, only="plug")  # Steckdosen aus HA weiter überwachen
+                except Exception:
+                    log.exception("%s: Fehler bei den HA-Steckdosen", self.name)
             except MqttError as e:
                 log.info("%s: MQTT: %s", self.name, e)
                 self.announced = False
@@ -165,6 +181,39 @@ class DeviceWorker(threading.Thread):
                 log.exception("%s: unerwarteter Fehler", self.name)
             self.wake.wait(max(1, interval - (time.time() - start)))
             self.wake.clear()
+
+    def add_forecast(self, values):
+        """Verbrauch je Tag und „reicht noch … Tage“ je Dosierbehälter.
+        Bevorzugt aus dem Dosierprotokoll (ab Firmware 7.52), sonst aus dem Füllstandsverlauf."""
+        now = time.time()
+        budget = 1  # Protokoll höchstens eines Dosierers je Runde lesen (viele Abfragen)
+        for it in self.items:
+            key = it["key"]
+            if it["kind"] != "doser" or key not in values or not self.settings.get(key)["aktiv"]:
+                continue
+            ml = values[key]
+            rate = None
+            if it.get("records"):
+                r, t = self.dose_rate.get(key, (None, 0))
+                if now - t > 1800 and budget:
+                    budget -= 1
+                    try:
+                        res = self.inv.dosed_since(it, now - 7 * 86400)
+                    except ReadError:
+                        res = None
+                    r = None
+                    if res and now - res[1] >= 86400:
+                        r = round(res[0] / ((now - res[1]) / 86400), 1)
+                    self.dose_rate[key] = (r, now)
+                rate = r
+            if it.get("capacity"):
+                fl_rate, _ = self.app.forecast.add(self.uid, key, ml, it["capacity"], now)
+                rate = rate if rate is not None else fl_rate
+            if rate is None:
+                continue
+            values[f"{key}_verbrauch"] = rate
+            if it.get("capacity") and rate >= 0.5:
+                values[f"{key}_tage"] = round(ml / rate, 1)
 
     def publish_summary(self):
         """Sammelstörung dieses Geräts (und über alle Geräte) nach HA melden."""
@@ -196,22 +245,25 @@ class DeviceWorker(threading.Thread):
         if (not self.unreachable_alerted and not self.app.maintenance()
                 and now - self.unreachable_since >= int(opts.get("nicht_erreichbar_nach", 600))):
             self.unreachable_alerted = True
+            self.app.log_event(self.name, "ProfiLux nicht erreichbar", "STÖRUNG")
             self.notify("ProfiLux nicht erreichbar",
                         f"Seit {int((now - self.unreachable_since) / 60)} min keine Antwort von {self.host}.",
                         urgent=True)
             self.publish_summary()
 
-    def check(self, values):
-        self._check(values)
+    def check(self, values, only=None):
+        self._check(values, only)
         by_key = {it["key"]: it for it in self.items}
         self.active = [(by_key[k]["label"], f.get("detail", "")) for k, f in self.faults.items()
                        if f.get("alerted") and k in by_key]
         self.publish_summary()
 
-    def _check(self, values):
+    def _check(self, values, only=None):
         now = time.time()
         reminder = int(self.app.opts.get("erinnerung", 3600))
         for it in self.items:
+            if only and it["kind"] != only:
+                continue
             key = it["key"]
             st = self.settings.get(key)
             watched, ok, detail = evaluate(it, st, values)
@@ -232,6 +284,7 @@ class DeviceWorker(threading.Thread):
                     f["alerted"], f["last"] = True, now
                     title = "Nachfüllen" if it["kind"] == "doser" else "STÖRUNG"
                     self.notify(f"{title}: {it['label']}", detail, urgent=it["kind"] != "doser")
+                    self.app.log_event(self.name, it["label"], title)
                 elif f["alerted"] and every and now - f["last"] >= every:
                     f["last"] = now
                     mins = int((now - f["since"]) / 60)
@@ -253,6 +306,8 @@ class App:
         self.opts = opts
         self.data_dir = Path(data_dir)
         self.store = SettingsStore(self.data_dir / "einstellungen.json")
+        self.forecast = Forecast(self.data_dir / "verbrauch.json")
+        self.plugs = HaPlugs(self.store)
         self.notifier = Notifier(opts.get("telegram_chat_id"), opts.get("telegram_token") or None,
                                  opts.get("app_push"), self.store)
         # Externer Broker (Optionen mqtt_*) hat Vorrang vor dem Mosquitto-Add-on
@@ -265,12 +320,17 @@ class App:
         self.bridge = Bridge(self.mqtt)
         self.bridge.notifier = self.notifier
         self.bridge.on_push = self._push_changed
+        self.bridge.plugs = self.plugs
+        self.bridge.on_plug = self._plug_changed
+        self.bridge.report_choice = self.report_choice
         self.bridge.commands_set = {"wartung": self._set_maintenance,
-                                    "wartung_dauer": self._set_maintenance_minutes}
+                                    "wartung_dauer": self._set_maintenance_minutes,
+                                    "wochenbericht": self._set_report}
         self.dashboard_dirty = threading.Event()
         self.dashboard = Dashboard(HaWs(), self.data_dir / "dashboard.json") if opts.get("dashboard", True) else None
         self.bridge.commands["dashboard"] = lambda: self._dashboard(force=True)
         self.bridge.commands["rescan"] = self._rescan
+        self.bridge.commands["bericht"] = lambda: self._send_report(manual=True)
         self.bridge.commands["telegram_test"] = lambda: self.notifier.send(
             "Test", "Der Aquarium-Wächter kann dich erreichen. So sieht ein Alarm aus.", urgent=True)
         self.workers = []
@@ -292,6 +352,68 @@ class App:
                 faults.append((f"{w.name} · ProfiLux nicht erreichbar", f"keine Antwort von {w.host}"))
             faults += [(f"{w.name} · {label}", detail) for label, detail in w.active]
         self.bridge.summary("_waechter", faults)
+
+    # ---------------------------------------------------------------- Ereignisse / Wochenbericht
+    def log_event(self, device, label, kind):
+        with self.store.lock:
+            ev = self.store.data.setdefault("ereignisse", [])
+            ev.append([time.time(), device, label, kind])
+            cutoff = time.time() - 8 * 86400
+            self.store.data["ereignisse"] = [e for e in ev if e[0] >= cutoff]
+        self.store.save()
+
+    def events(self):
+        return list(self.store.data.get("ereignisse", []))
+
+    def report_choice(self):
+        v = self.store.data.get("wochenbericht")
+        return v if v in report.OPTIONS else "Sonntag"
+
+    def _set_report(self, raw):
+        if raw in report.OPTIONS:
+            self.store.data["wochenbericht"] = raw
+            self.store.save()
+            log.info("Wochenbericht: %s", raw)
+        try:
+            self.bridge.publish_report(self.report_choice())
+        except MqttError:
+            pass
+
+    def _send_report(self, manual=False):
+        def run():
+            try:
+                self.notifier.send("Wochenbericht", report.build(self))
+            except Exception:
+                log.exception("Wochenbericht nicht erstellt")
+        if not manual:
+            self.store.data["bericht_zuletzt"] = time.strftime("%Y-%m-%d")
+            self.store.save()
+        threading.Thread(target=run, daemon=True, name="bericht").start()
+
+    # ---------------------------------------------------------------- HA-Steckdosen
+    def refresh_plugs(self):
+        if self.plugs.refresh():
+            try:
+                self.bridge.announce_waechter()
+            except MqttError:
+                pass
+            for w in self.workers:
+                if w.inv.scanned:
+                    w.items_changed()
+            self.dashboard_dirty.set()
+
+    def _plug_changed(self, slug, raw):
+        names = {w.name: w.uid for w in self.workers}
+        if raw == "ON":
+            uid = self.workers[0].uid if self.workers else None
+        else:
+            uid = names.get(raw)
+        res = self.plugs.assign(slug, uid)
+        if res is None:
+            return
+        for w in self.workers:
+            if w.uid in res:
+                w.items_changed()
 
     # ---------------------------------------------------------------- Wartung
     def maintenance(self):
@@ -343,6 +465,7 @@ class App:
         log.info("Push an %s: %s", phone, "an" if on else "aus")
 
     def _rescan(self):
+        threading.Thread(target=self.refresh_plugs, daemon=True).start()
         before = list(self.notifier.phones)
         if self.notifier.refresh_phones() != before:
             try:
@@ -370,6 +493,11 @@ class App:
         except MqttError:
             pass
         self._publish_maintenance()
+        self.refresh_plugs()
+        try:
+            self.bridge.publish_report(self.report_choice())
+        except MqttError:
+            pass
         for w in self.workers:
             w.start()
         if self.opts.get("start_meldung", False):
@@ -379,6 +507,8 @@ class App:
             if self.store.data.get("wartung_bis") and not self.maintenance():
                 self._end_maintenance()
                 self._publish_maintenance()
+            if report.due(self.report_choice(), self.store.data.get("bericht_zuletzt")):
+                self._send_report()
             if self.dashboard_dirty.is_set() and all(w.inv.scanned for w in self.workers):
                 self.dashboard_dirty.clear()
                 self._dashboard()

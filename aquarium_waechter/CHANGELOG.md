@@ -3,6 +3,27 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.4.0
+
+- **Dosierbehälter: „reicht noch … Tage“.** Das Add-on rechnet den Verbrauch je Tag aus
+  und meldet „Nachfüllen“ rechtzeitig, wenn der Vorrat nur noch für wenige Tage reicht
+  (neue Einstellung „… oder Vorrat unter“, Standard 3 Tage, 0 = aus). Die ersten Werte
+  kommen nach etwa einem Tag.
+- **Letzte Dosierung** (Zeit und ml) je Dosierer – ab ProfiLux-Firmware 7.52. Der Verbrauch
+  wird dann direkt aus dem Dosierprotokoll berechnet (genauer, auch ohne Behältergröße).
+- **Wochenbericht** per Push/Telegram: Mittel, Minimum und Maximum der Messwerte,
+  Verbrauch und Vorrat der Dosierbehälter, Störungen der Woche. Wochentag auf der
+  Einstellungsseite wählbar (Standard Sonntag, gegen 18 Uhr), Knopf „Wochenbericht jetzt senden“.
+- **Steckdosen aus Home Assistant** (Shelly Plug S u. a. mit Leistungsmessung): auf der
+  Einstellungsseite einschalten → im Dashboard mit Zustand und Leistung, überwacht wie eine
+  ProfiLux-Steckdose (Leistung zu niedrig/zu hoch, nicht erreichbar), mit Wartung und
+  Sammelstörung. Das Add-on schaltet sie nicht.
+- **Einstellungsseite kompakter:** Karten werden lückenlos angeordnet, kurze Beschriftungen,
+  Leisten ohne Strommessung nur noch eine Zeile je Dose.
+- Übersicht: Dosierbehälter als Tabelle (Füllstand, reicht noch, Verbrauch, letzte Dosierung).
+- Dashboard: kurze Kürzel, damit Namen nicht abgeschnitten werden – **SD 2.3** = Steckdose
+  (Leiste 2, Dose 3), **DP 4** = Dosierpumpe 4. In den Meldungen bleibt der volle Name.
+
 ## 4.3.7
 
 - Dashboard: Bei Steckdosenleisten mit Strommessung (z. B. Powerbar 6E-PAB) steht jetzt

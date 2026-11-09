@@ -264,6 +264,18 @@ def record_status(raw):
         return None, None
 
 
+def dose_record(raw):
+    """'1785233341,5.0,5.0,12,0' -> (zeit, dosiert_ml, geplant_ml) oder None (ältere Firmware)."""
+    parts = str(raw).split(",")
+    try:
+        t = float(parts[0])
+        if len(parts) < 3 or t < 1e9:
+            return None
+        return t, float(parts[1]), float(parts[2])
+    except ValueError:
+        return None
+
+
 class Inventory:
     """Findet heraus, was der ProfiLux hat. Jedes gefundene Teil ist ein "Item":
     {"key", "kind", "name", "named", ...}. Abgefragt werden nur aktive Items
@@ -439,7 +451,7 @@ class Inventory:
         for d in self.dosers:
             out.append({"key": f"doser_{d['i']}", "kind": "doser", "name": d["name"],
                         "label": label(f"Dosierer {d['i'] + 1}", d), "capacity": d.get("capacity", 0),
-                        "named": d["named"], "unit": "ml", "i": d["i"]})
+                        "named": d["named"], "unit": "ml", "i": d["i"], "records": self.status_bits})
         for l in self.lights:
             out.append({"key": f"light_{l['i']}", "kind": "light", "name": l["name"],
                         "label": label(f"Licht {l['i'] + 1}", l), "named": l["named"], "unit": "%", "i": l["i"]})
@@ -483,6 +495,12 @@ class Inventory:
                 put(k, f"GET DOSER[{it['i']}] FILLLEVEL")
                 if it.get("capacity") and k in values:
                     values[f"{k}_pct"] = round(min(100.0, values[k] / it["capacity"] * 100), 1)
+                if self.status_bits:
+                    # Letzte Dosierung (ab Firmware 7.52): "zeit,dosiert_ml,geplant_ml,dauer_s,status"
+                    put(f"{k}_rec", f"GET DOSER[{it['i']}] DATARECORD[0]", dose_record)
+                    rec = values.pop(f"{k}_rec", None)
+                    if rec:
+                        values[f"{k}_last"], values[f"{k}_dosiert"], values[f"{k}_geplant"] = rec
             elif kind == "light":
                 put(k, f"GET ILLUMINATION[{it['i']}] ACTBRIGHTNESS", lambda v: round(float(v), 1))
             elif kind == "age":
@@ -495,3 +513,20 @@ class Inventory:
                 if status is not None:
                     values["kh_status"] = status
         return values
+
+    def dosed_since(self, it, since, limit=300):
+        """Summe der dosierten ml seit `since` aus dem Dosierprotokoll -> (ml, ältester Eintrag)
+        oder None (ältere Firmware, kein Protokoll)."""
+        total, oldest = 0.0, None
+        for r in range(limit):
+            try:
+                rec = dose_record(self.ghl.get(f"GET DOSER[{it['i']}] DATARECORD[{r}]"))
+            except NackError:
+                break  # -104 = Ende des Protokolls
+            if not rec:
+                return None if r == 0 else (total, oldest)
+            t, dosed, _ = rec
+            if t < since:
+                return total, since
+            total, oldest = total + dosed, t
+        return (total, oldest) if oldest else None

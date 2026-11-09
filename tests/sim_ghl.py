@@ -57,6 +57,14 @@ def answer(cmd, p):
         return {"ACTSTATE": num(st), "DESCRIPTION": txt(d)}.get(attr, "NACK (-5)")
     if obj == "DOSER" and i in p["dosers"]:
         d, ml = p["dosers"][i]
+        if attr == "DATARECORD":
+            if not p.get("fw752"):
+                return num(ml)  # ältere Firmware: unbrauchbare Zahl
+            r = int(u or 0)
+            if r >= 60:
+                return "NACK (-104)"
+            t = int(time.time()) - 3600 - r * 6 * 3600  # alle 6 h 5 ml
+            return f'ACK <"{t},{5.0 if i != 2 else 2.5},5.0,12,0">'
         return {"DESCRIPTION": txt(d), "FILLLEVEL": num(ml), "CAPACITY": num(1700.0)}.get(attr, "NACK (-5)")
     if obj == "ILLUMINATION" and i < 16 and m[2] is not None:
         d, v = p.get("lights", {}).get(i, ("", 0.0))

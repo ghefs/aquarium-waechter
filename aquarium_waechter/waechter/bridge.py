@@ -15,6 +15,8 @@ import logging
 from .notify import phone_name
 from .ghl import CATEGORIES, CATEGORY_NAMES, MAX_STRIPS, NO_STRIP, SENSOR_ARTS, STRIP_TYPES
 from .mqtt import MqttError
+from .extern import OFF as PLUG_OFF
+from .report import OPTIONS as REPORT_OPTIONS
 from .settings import LEVEL_MODES, rule
 
 log = logging.getLogger("waechter")
@@ -35,10 +37,14 @@ class Bridge:
         mqtt.subscribe(f"{prefix}/+/leiste/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/+")
         mqtt.subscribe(f"{prefix}/_waechter/push/+/set")
+        mqtt.subscribe(f"{prefix}/_waechter/plug/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/+/set")
         self.commands_set = {}  # Name -> Funktion(payload) (Schalter/Zahlen des Wächters)
         self.notifier = None   # für die Schalter „Push an …“
         self.on_push = None
+        self.plugs = None      # Steckdosen aus HA (extern.HaPlugs)
+        self.on_plug = None
+        self.report_choice = lambda: "Sonntag"
 
     # ------------------------------------------------------------ eingehend
     def _on_connect(self):
@@ -62,6 +68,11 @@ class Bridge:
             if self.notifier and parts[3] in self.notifier.phones and self.on_push:
                 self.on_push(parts[3], payload)
                 self.publish_push()
+            return
+        if len(parts) == 5 and parts[1] == "_waechter" and parts[2] == "plug" and parts[4] == "set":
+            if self.on_plug:
+                self.on_plug(parts[3], payload)
+                self.publish_plugs()
             return
         if len(parts) == 5 and parts[2] == "leiste" and parts[4] == "set" and parts[3].isdigit():
             dev, n = self.devices.get(parts[1]), int(parts[3])
@@ -134,7 +145,9 @@ class Bridge:
                                      ("telegram_test", "Test-Alarm senden", "mdi:send",
                                       "button.aquarium_waechter_telegram_test"),
                                      ("rescan", "Geräte neu einlesen", "mdi:refresh",
-                                      "button.aquarium_waechter_neu_einlesen")):
+                                      "button.aquarium_waechter_neu_einlesen"),
+                                     ("bericht", "Wochenbericht jetzt senden", "mdi:file-chart-outline",
+                                      "button.aquarium_waechter_bericht")):
             if cmd in self.commands:
                 self._conf("button", f"aquarium_waechter_{cmd}", {
                     "unique_id": f"aquarium_waechter_{cmd}", "name": name, "icon": icon,
@@ -162,6 +175,14 @@ class Bridge:
             "command_topic": f"{self.prefix}/_waechter/wartung_dauer/set",
             "default_entity_id": "number.aquarium_waechter_wartung_dauer",
             "availability_topic": self.avail, "device": dev})
+        self._conf("select", "aquarium_waechter_wochenbericht", {
+            "unique_id": "aquarium_waechter_wochenbericht", "name": "Wochenbericht",
+            "icon": "mdi:calendar-week", "options": REPORT_OPTIONS, "entity_category": "config",
+            "state_topic": f"{self.prefix}/_waechter/wochenbericht",
+            "command_topic": f"{self.prefix}/_waechter/wochenbericht/set",
+            "default_entity_id": "select.aquarium_waechter_wochenbericht",
+            "availability_topic": self.avail, "device": dev})
+        self.announce_plugs(dev)
         known = set(self.store_known("push"))
         if self.notifier:
             for phone in self.notifier.phones:
@@ -178,6 +199,48 @@ class Bridge:
             self.store_known("push", self.notifier.phones)
             self.publish_push()
         self._pub(self.avail, "online", retain=True)
+
+    def announce_plugs(self, dev):
+        """Je Steckdose aus HA: übernehmen (ein ProfiLux: Schalter, mehrere: Auswahl)."""
+        if not self.plugs:
+            return
+        names = [d.name for d in self.devices.values()]
+        known = set(self.store_known("plugs"))
+        for p in self.plugs.plugs:
+            u = f"aquarium_waechter_plug_{p['slug']}"
+            conf = {"unique_id": u, "name": f"{p['name']} überwachen", "icon": "mdi:power-plug-outline",
+                    "entity_category": "config",
+                    "state_topic": f"{self.prefix}/_waechter/plug/{p['slug']}",
+                    "command_topic": f"{self.prefix}/_waechter/plug/{p['slug']}/set",
+                    "availability_topic": self.avail, "device": dev}
+            if len(names) > 1:
+                self._remove("switch", u)
+                self._conf("select", u, {**conf, "options": [PLUG_OFF] + names,
+                                         "default_entity_id": f"select.{u}"})
+            else:
+                self._remove("select", u)
+                self._conf("switch", u, {**conf, "default_entity_id": f"switch.{u}"})
+            known.discard(p["slug"])
+        for gone in known:  # Steckdose aus HA verschwunden
+            self._remove("switch", f"aquarium_waechter_plug_{gone}")
+            self._remove("select", f"aquarium_waechter_plug_{gone}")
+        self.store_known("plugs", [p["slug"] for p in self.plugs.plugs])
+        self.publish_plugs()
+
+    def publish_plugs(self):
+        if not self.plugs:
+            return
+        names = {d.uid: d.name for d in self.devices.values()}
+        for p in self.plugs.plugs:
+            owner = self.plugs.owner(p)
+            if len(names) > 1:
+                v = names.get(owner, PLUG_OFF)
+            else:
+                v = "ON" if owner in names else "OFF"
+            self._pub(f"{self.prefix}/_waechter/plug/{p['slug']}", v, retain=True)
+
+    def publish_report(self, choice):
+        self._pub(f"{self.prefix}/_waechter/wochenbericht", choice, retain=True)
 
     def publish_maintenance(self, on, until, minutes):
         self._pub(f"{self.prefix}/_waechter/wartung", "ON" if on else "OFF", retain=True)
@@ -319,7 +382,7 @@ class Bridge:
                     gone("switch" if suffix == "enabled" else "number", f"cfg_{key}_{suffix}")
                 gone("sensor", f"{key}_current")
             if kind == "doser" and not it.get("capacity"):
-                for comp, suffix in (("switch", "enabled"), ("number", "min")):
+                for comp, suffix in (("switch", "enabled"), ("number", "min"), ("number", "tage")):
                     gone(comp, f"cfg_{key}_{suffix}")
             for comp, suffix, conf in cfgs:
                 field = suffix.rsplit("_", 1)[1]
@@ -330,7 +393,7 @@ class Bridge:
     @staticmethod
     def _eid_suffix(field):
         return {"enabled": "ueberwachen", "min": "min", "max": "max", "delay": "verzoegerung",
-                "mode": "alarm", "art": "art"}[field]
+                "mode": "alarm", "art": "art", "tage": "tage"}[field]
 
     @staticmethod
     def _measurements(it, uid):
@@ -367,6 +430,8 @@ class Bridge:
             return out
         if kind == "level":
             return [("sensor", key, {"name": name, "value_template": tpl(key), "icon": "mdi:waves-arrow-up"})]
+        if kind == "plug":
+            return []  # Zustand und Leistung kommen direkt von der HA-Steckdose
         if kind == "doser":
             out = [("sensor", key, {
                 "name": f"{name} – Füllstand", "device_class": "volume_storage", "unit_of_measurement": "mL",
@@ -377,6 +442,24 @@ class Bridge:
                     "name": f"{name} – Füllstand %", "unit_of_measurement": "%", "state_class": "measurement",
                     "suggested_display_precision": 0, "icon": "mdi:cup-water",
                     "value_template": tpl(f"{key}_pct")}))
+            if it.get("capacity") or it.get("records"):
+                out.append(("sensor", f"{key}_verbrauch", {
+                    "name": f"{name} – Verbrauch", "unit_of_measurement": "mL/d", "state_class": "measurement",
+                    "suggested_display_precision": 1, "icon": "mdi:chart-line-variant",
+                    "value_template": tpl(f"{key}_verbrauch")}))
+            if it.get("capacity"):
+                out.append(("sensor", f"{key}_tage", {
+                    "name": f"{name} – reicht noch", "unit_of_measurement": "d", "device_class": "duration",
+                    "state_class": "measurement", "suggested_display_precision": 0,
+                    "icon": "mdi:calendar-clock", "value_template": tpl(f"{key}_tage")}))
+            if it.get("records"):
+                out.append(("sensor", f"{key}_letzte", {
+                    "name": f"{name} – letzte Dosierung", "device_class": "timestamp",
+                    "value_template": tpl(f"{key}_last_iso")}))
+                out.append(("sensor", f"{key}_dosiert", {
+                    "name": f"{name} – zuletzt dosiert", "device_class": "volume", "unit_of_measurement": "mL",
+                    "suggested_display_precision": 1, "icon": "mdi:water-plus",
+                    "value_template": tpl(f"{key}_dosiert")}))
             return out
         if kind == "light":
             return [("sensor", key, {"name": name, "unit_of_measurement": "%", "state_class": "measurement",
@@ -395,6 +478,9 @@ class Bridge:
         ("value", "min"): "Alarm, wenn Wert unter",
         ("value", "max"): "Alarm, wenn Wert über",
         ("doser", "min"): "Nachfüllen melden unter",
+        ("doser", "tage"): "Nachfüllen melden, wenn Vorrat unter",
+        ("plug", "min"): "Alarm, wenn AN und Leistung unter",
+        ("plug", "max"): "Alarm, wenn Leistung über (0 = aus)",
         ("age", "max"): "Alarm, wenn keine Messung seit",
         "delay": "Alarm erst nach (Dauer)",
         "mode": "Alarm, wenn Sensor meldet",
@@ -425,11 +511,13 @@ class Bridge:
             out.append(("switch", f"cfg_{key}_enabled", {
                 "name": f"{name} – {cls.label_of(kind, 'enabled')}", "payload_on": "ON", "payload_off": "OFF",
                 "state_on": "ON", "state_off": "OFF", "icon": "mdi:bell-ring-outline"}))
-            lo, hi, step = {"switch": (0, 20, 0.01), "doser": (0, 100000, 10),
+            lo, hi, step = {"switch": (0, 20, 0.01), "doser": (0, 100000, 10), "plug": (0, 5000, 0.5),
                             "age": (0.5, 168, 0.5)}.get(kind, (-1000, 10000, 0.001))
-            if kind in ("switch", "value", "doser"):
+            if kind in ("switch", "value", "doser", "plug"):
                 out.append(num(lo, hi, step, unit, "min"))
-            if kind in ("switch", "value", "age"):
+            if kind == "doser":
+                out.append(num(0, 60, 1, "d", "tage"))
+            if kind in ("switch", "value", "age", "plug"):
                 out.append(num(lo, hi, step, unit, "max"))
         if kind not in ("age", "doser"):
             out.append(num(0, 1440, 1, "min", "delay"))
@@ -442,8 +530,8 @@ class Bridge:
     # ------------------------------------------------------------ Zustände
     def values(self, dev, values):
         v = dict(values)
-        if "kh_last" in v:
-            v["kh_last_iso"] = datetime.datetime.fromtimestamp(v["kh_last"], datetime.timezone.utc).isoformat()
+        for k in [k for k in v if k.endswith("_last")]:
+            v[f"{k}_iso"] = datetime.datetime.fromtimestamp(v[k], datetime.timezone.utc).isoformat()
         self._pub(f"{self.prefix}/{dev.uid}/state", v)
 
     def connected(self, dev, ok):

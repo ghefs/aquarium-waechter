@@ -18,7 +18,9 @@ DEFAULTS = {
     "switch": {"aktiv": None, "enabled": False, "min": 0.05, "max": 0.0, "delay": 2.0},
     "value": {"aktiv": None, "enabled": False, "min": 0.0, "max": 0.0, "delay": 10.0, "art": None},
     "level": {"aktiv": None, "mode": "Aus", "delay": 1.0},
-    "doser": {"aktiv": None, "enabled": False, "min": 500.0, "delay": 0.0},
+    "doser": {"aktiv": None, "enabled": False, "min": 500.0, "tage": 3.0, "delay": 0.0},
+    # Steckdose aus Home Assistant (Shelly Plug …): Leistung in W
+    "plug": {"aktiv": True, "enabled": False, "min": 3.0, "max": 0.0, "delay": 2.0},
     # KH-Director misst typ. alle 4–5 h -> Warnung nach 7 h ohne Messung, standardmäßig an
     "age": {"aktiv": None, "enabled": True, "max": 7.0, "delay": 0.0},
     # Licht: nur anzeigen – die Helligkeit ändert sich über den Tag, ein Alarm wäre sinnlos
@@ -32,6 +34,8 @@ REMINDER = {"doser": 24 * 3600}
 def kind_of(key):
     if key == "kh_age":
         return "age"
+    if key.startswith("ha_"):
+        return "plug"
     for prefix in ("switch", "level", "doser", "light"):
         if key.startswith(prefix + "_"):
             return prefix
@@ -191,6 +195,13 @@ def rule(item, st):
         if st["max"] > 0:
             txt += f" oder mehr als {de(st['max'], 'A')}"
         return txt + later + "."
+    if kind == "plug":
+        if not st["enabled"]:
+            return "Kein Alarm (Überwachung aus)."
+        txt = f"Alarm, wenn das Gerät AN ist, aber weniger als {de(st['min'], 'W')} zieht (läuft nicht)"
+        if st["max"] > 0:
+            txt += f" oder mehr als {de(st['max'], 'W')}"
+        return txt + ", oder wenn die Steckdose in Home Assistant nicht erreichbar ist" + later + "."
     if kind == "level":
         if st["mode"] == "Aus":
             return "Kein Alarm (Auswahl „Alarm bei“ steht auf Aus)."
@@ -205,7 +216,10 @@ def rule(item, st):
             return "Nur Anzeige – im ProfiLux ist für diesen Behälter keine Größe eingetragen, der Füllstand wird dort nicht geführt. Für die Meldung „Nachfüllen“ in GHL Connect die Behältergröße eintragen und danach „Geräte neu einlesen“."
         if not st["enabled"]:
             return "Kein Alarm (Überwachung aus)."
-        return f"Meldung „Nachfüllen“, wenn weniger als {de(st['min'], 'ml')} im Behälter sind (1× täglich)."
+        txt = f"Meldung „Nachfüllen“, wenn weniger als {de(st['min'], 'ml')} im Behälter sind"
+        if st.get("tage"):
+            txt += f" oder der Vorrat nur noch für weniger als {de(st['tage'])} Tage reicht"
+        return txt + " (1× täglich)."
     if not st["enabled"]:
         return "Kein Alarm (Überwachung aus)."
     if st["min"] >= st["max"]:
@@ -232,6 +246,22 @@ def evaluate(item, st, values):
         if st["max"] > 0 and cur > st["max"]:
             return watched, False, f"Strom zu hoch: {fmt(cur, 'A')} (Maximum {fmt(st['max'], 'A')})"
         return watched, True, f"an, {fmt(cur, 'A')}"
+    if kind == "plug":
+        watched = st["enabled"]
+        if f"{key}_state" not in values:  # Home Assistant selbst nicht abfragbar (z. B. Neustart)
+            return watched, None, "kein Wert"
+        state, w = values.get(f"{key}_state"), values.get(f"{key}_power")
+        if state is None:
+            return watched, False, "in Home Assistant nicht erreichbar"
+        if state == "OFF":
+            return watched, True, "aus"
+        if w is None:
+            return watched, True, "an"
+        if w < st["min"]:
+            return watched, False, f"an, aber nur {fmt(w, 'W')} (Minimum {fmt(st['min'], 'W')})"
+        if st["max"] > 0 and w > st["max"]:
+            return watched, False, f"Leistung zu hoch: {fmt(w, 'W')} (Maximum {fmt(st['max'], 'W')})"
+        return watched, True, f"an, {fmt(w, 'W')}"
     if kind == "light":
         v = values.get(key)
         return False, True if v is not None else None, "kein Wert" if v is None else fmt(v, "%")
@@ -264,11 +294,16 @@ def evaluate(item, st, values):
             return watched, None, "kein Wert"
         if not watched:
             return watched, True, f"{v:.0f} ml"
+        pct, days = values.get(f"{key}_pct"), values.get(f"{key}_tage")
+        rest = f"noch {v:.0f} ml" + (f" ({pct:.0f} %)" if pct is not None else "")
+        reach = f", reicht ca. {fmt(days)} Tage" if days is not None else ""
         if v < st["min"]:
-            pct = values.get(f"{key}_pct")
-            rest = f"noch {v:.0f} ml" + (f" ({pct:.0f} %)" if pct is not None else "")
-            return watched, False, f"Behälter fast leer: {rest} (Meldung unter {st['min']:.0f} ml)"
-        return watched, True, f"{v:.0f} ml"
+            return watched, False, f"Behälter fast leer: {rest}{reach} (Meldung unter {st['min']:.0f} ml)"
+        if st.get("tage") and days is not None and days < st["tage"]:
+            per = values.get(f"{key}_verbrauch")
+            return watched, False, (f"Vorrat reicht nur noch ca. {fmt(days)} Tage: {rest}"
+                                    + (f", Verbrauch ca. {fmt(per)} ml/Tag" if per else ""))
+        return watched, True, f"{v:.0f} ml{reach}"
     watched, v = st["enabled"], values.get(key)
     status = values.get(f"{key}_status") or 0
     if status & 1536:  # Sensorfehler / Kommunikationsfehler laut ProfiLux (ab Firmware 7.52)

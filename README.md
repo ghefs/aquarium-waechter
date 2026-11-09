@@ -33,6 +33,12 @@ Home-Assistant-Add-on, das einen oder mehrere Aquariencomputer **GHL ProfiLux 4*
   HA-App (klingelt auch nachts im Stumm-Modus) und/oder per Telegram: Pumpe steht (zu wenig Strom),
   Temperatur außerhalb der Grenzen, Dosierbehälter fast leer, keine KH-Messung mehr,
   ProfiLux nicht erreichbar. Mit Verzögerung, Erinnerung und „Wieder OK“
+- **Steckdosen aus Home Assistant mit überwachen:** Weitere Pumpe oder externes Licht an
+  einer **Shelly Plug S** (oder einer anderen Steckdose mit Leistungsmessung)? Auf der
+  Einstellungsseite einschalten – sie steht im Dashboard und wird wie eine ProfiLux-Steckdose
+  überwacht (zu wenig/zu viel Leistung, nicht erreichbar)
+- **Wochenbericht** aufs Handy: Mittel/Min/Max der Messwerte, Verbrauch und Vorrat der
+  Dosierbehälter, Störungen der Woche
 - **Wartungsmodus:** Ein Schalter pausiert die Alarme, solange man am Becken arbeitet
 - **Alles in HA einstellbar:** was abgefragt wird, was überwacht wird, Grenzwerte
 - **Dashboard wird automatisch erzeugt** – eine Übersicht und eine Einstellungsseite je ProfiLux
@@ -53,7 +59,9 @@ Genau diese Lücke schließt der Aquarium-Wächter:
 - **KH-Director im Blick:** Seit Stunden keine Messung mehr (Reagenz leer, Schlauch
   verstopft)? → Alarm. Ab Firmware 7.52 zusätzlich Leck- und Messbereichsalarm.
 - **Sensorfehler:** Sonde liefert keinen gültigen Wert mehr? → Alarm (ab Firmware 7.52).
-- **Dosierbehälter:** rechtzeitig „Nachfüllen“, in ml und %.
+- **Dosierbehälter:** Verbrauch je Tag und **„reicht noch … Tage“** – Meldung „Nachfüllen“
+  rechtzeitig, bevor der Behälter leer ist. Ab Firmware 7.52 auch die **letzte Dosierung**
+  (Zeit und ml).
 - **ProfiLux weg** (Stromausfall, WLAN, API nach Firmware-Update aus)? → Alarm.
 - Alles mit Verzögerung gegen Fehlalarme, Erinnerung und „Wieder OK“ – aufs Handy,
   per HA-App und/oder Telegram.
