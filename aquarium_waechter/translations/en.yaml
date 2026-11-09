@@ -1,0 +1,40 @@
+configuration:
+  geraete:
+    name: "ProfiLux devices"
+    description: "Per ProfiLux: name and host (IP). Everything else is easier in HA on the dashboard settings page. Optional default: steckdosenleisten (sockets per power bar, e.g. \"STDL=4 (ohne Strom), PAB=6\" – easier: select the power bars in HA). Areas (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht) are easier to switch in HA on the settings page. unbenannte_abfragen: also read unnamed items."
+  telegram_chat_id:
+    name: "Telegram chat ID"
+    description: "Where alarms go – group (starts with -) or private chat (positive number), several separated by commas. How to find the ID: see the wiki, \"Telegram\". Empty = no Telegram."
+  app_push:
+    name: "Push to the Home Assistant app"
+    description: "Not needed – easier in HA on the settings page under \"Alarm on your phone\", per phone. Only a default here, e.g. mobile_app_iphone_of_max, several separated by commas. Faults arrive as critical notifications (ring even in silent mode and Do Not Disturb)."
+  telegram_token:
+    name: "Telegram bot token"
+    description: "Leave empty if the Telegram integration is set up in HA – its token is used then."
+  intervall:
+    name: "Polling interval (seconds)"
+  erinnerung:
+    name: "Reminder while a fault persists (seconds, 0 = off)"
+  nicht_erreichbar_nach:
+    name: "\"Unreachable\" alarm after (seconds)"
+  rescan:
+    name: "Rescan inventory every (seconds)"
+  dashboard:
+    name: "Create dashboard automatically"
+    description: "Own dashboard \"Aquarium\". Manual changes are detected and not overwritten."
+  start_meldung:
+    name: "Message on start"
+  mqtt_host:
+    name: "External MQTT broker (host)"
+    description: "Only fill in if you do NOT use the Mosquitto add-on."
+  mqtt_port:
+    name: "External MQTT broker (port)"
+  mqtt_user:
+    name: "External MQTT broker (user)"
+  mqtt_password:
+    name: "External MQTT broker (password)"
+  sprache:
+    name: "Language"
+    description: "Language of dashboard, entities and messages. auto = same as Home Assistant (unsupported languages → English)."
+  debug:
+    name: "Verbose log"

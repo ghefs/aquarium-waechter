@@ -1,0 +1,40 @@
+configuration:
+  geraete:
+    name: "Dispositivos ProfiLux"
+    description: "Por ProfiLux: name y host (IP). Todo lo demás es más cómodo en HA, en la página de ajustes del panel. Valor por defecto opcional: steckdosenleisten (enchufes por regleta, p. ej. \"STDL=4 (ohne Strom), PAB=6\" – más fácil: elegir las regletas en HA). Las áreas (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht) se activan más fácilmente en HA. unbenannte_abfragen: leer también elementos sin nombre."
+  telegram_chat_id:
+    name: "ID de chat de Telegram"
+    description: "Destino de las alarmas – grupo (empieza por -) o chat privado (número positivo), varios separados por comas. Cómo encontrar el ID: ver la wiki, \"Telegram\". Vacío = sin Telegram."
+  app_push:
+    name: "Push a la app de Home Assistant"
+    description: "No es necesario – más cómodo en HA, página de ajustes, \"Alarma en el móvil\", por móvil. Aquí solo un valor por defecto, p. ej. mobile_app_iphone_de_max, varios separados por comas. Las averías llegan como notificación crítica (suena incluso en silencio y No molestar)."
+  telegram_token:
+    name: "Token del bot de Telegram"
+    description: "Déjalo vacío si la integración de Telegram está configurada en HA – entonces se usa su token."
+  intervall:
+    name: "Intervalo de consulta (segundos)"
+  erinnerung:
+    name: "Recordatorio si la avería persiste (segundos, 0 = apagado)"
+  nicht_erreichbar_nach:
+    name: "Alarma \"no accesible\" tras (segundos)"
+  rescan:
+    name: "Volver a leer el inventario cada (segundos)"
+  dashboard:
+    name: "Crear el panel automáticamente"
+    description: "Panel propio \"Aquarium\". Los cambios manuales se detectan y no se sobrescriben."
+  start_meldung:
+    name: "Aviso al iniciar"
+  mqtt_host:
+    name: "Broker MQTT externo (host)"
+    description: "Rellenar solo si NO se usa el add-on Mosquitto."
+  mqtt_port:
+    name: "Broker MQTT externo (puerto)"
+  mqtt_user:
+    name: "Broker MQTT externo (usuario)"
+  mqtt_password:
+    name: "Broker MQTT externo (contraseña)"
+  sprache:
+    name: "Idioma"
+    description: "Idioma del panel, las entidades y los avisos. auto = como Home Assistant (idiomas no soportados → inglés)."
+  debug:
+    name: "Registro detallado"

@@ -37,11 +37,14 @@ Home-Assistant-Add-on, das einen oder mehrere Aquariencomputer **GHL ProfiLux 4*
   einer **Shelly Plug S** (oder einer anderen Steckdose mit Leistungsmessung)? Auf der
   Einstellungsseite einschalten – sie steht im Dashboard und wird wie eine ProfiLux-Steckdose
   überwacht (zu wenig/zu viel Leistung, nicht erreichbar)
+- **Gesamtleistung und Energie** des Aquariums (W, kWh – auch fürs Energie-Dashboard von HA)
 - **Wochenbericht** aufs Handy: Mittel/Min/Max der Messwerte, Verbrauch und Vorrat der
   Dosierbehälter, Störungen der Woche
 - **Wartungsmodus:** Ein Schalter pausiert die Alarme, solange man am Becken arbeitet
 - **Alles in HA einstellbar:** was abgefragt wird, was überwacht wird, Grenzwerte
 - **Dashboard wird automatisch erzeugt** – eine Übersicht und eine Einstellungsseite je ProfiLux
+- **Fünf Sprachen:** Deutsch, English, Français, Español, Italiano – Dashboard, Entitäten und
+  Meldungen automatisch in der Sprache von Home Assistant (Option `sprache`)
 - Beliebig viele ProfiLux, jeder mit eigener Ausstattung (1 oder 6 Steckdosenleisten,
   2 oder 12 Dosierer …). Erkannt wird automatisch, was vorhanden ist
 

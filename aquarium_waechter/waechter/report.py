@@ -7,6 +7,7 @@ import logging
 import time
 
 from .haws import HaError, HaWs
+from .i18n import _
 from .settings import fmt
 
 log = logging.getLogger("waechter")
@@ -41,7 +42,7 @@ def build(app, ha=None, now=None):
     now = now or time.time()
     end = datetime.datetime.fromtimestamp(now).astimezone()
     start = end - datetime.timedelta(days=7)
-    lines = [f"📊 {start:%d.%m.} – {end:%d.%m.%Y}"]
+    lines = [f"📊 {start.strftime(_('%d.%m.'))} – {end.strftime(_('%d.%m.%Y'))}"]
     ha = ha or HaWs()
     events = [e for e in app.events() if e[0] >= now - 7 * 86400]
     try:
@@ -50,8 +51,9 @@ def build(app, ha=None, now=None):
             lines.append(f"\n🐠 {w.name}")
             values = [it for it in items if it["kind"] == "value"]
             ids = [f"sensor.{w.uid}_{it['key']}" for it in values]
+            power_id = f"sensor.{w.uid}_gesamt_leistung"
             try:
-                st = stats(ha, ids, start, end)
+                st = stats(ha, ids + ([power_id] if w.has_power() else []), start, end)
             except HaError as e:
                 log.info("Wochenbericht: Statistik nicht abfragbar: %s", e)
                 st = {}
@@ -61,10 +63,14 @@ def build(app, ha=None, now=None):
                     mean, lo, hi = st[sid]
                     lines.append(f"• {it['label']}: Ø {_num(mean, unit)} ({_num(lo)} – {_num(hi)})")
                 elif w.last_values.get(it["key"]) is not None:
-                    lines.append(f"• {it['label']}: {_num(w.last_values[it['key']], unit)} (noch kein Verlauf)")
+                    lines.append(f"• {it['label']}: {_num(w.last_values[it['key']], unit)} ({_('noch kein Verlauf')})")
+            if power_id in st:
+                mean = st[power_id][0]
+                lines.append("⚡ " + _("Gesamtleistung: Ø {w} W, ca. {kwh} kWh in 7 Tagen",
+                                       w=_num(round(mean)), kwh=_num(round(mean * 168 / 1000, 1))))
             dosers = [it for it in items if it["kind"] == "doser"]
             if dosers:
-                lines.append("Dosierer:")
+                lines.append(_("Dosierer:"))
             for it in dosers:
                 v = w.last_values
                 parts = []
@@ -72,9 +78,9 @@ def build(app, ha=None, now=None):
                     pct = v.get(f"{it['key']}_pct")
                     parts.append(f"{v[it['key']]:.0f} ml" + (f" ({pct:.0f} %)" if pct is not None else ""))
                 if v.get(f"{it['key']}_verbrauch") is not None:
-                    parts.append(f"{_num(v[it['key'] + '_verbrauch'])} ml/Tag")
+                    parts.append(_("{v} ml/Tag", v=_num(v[it["key"] + "_verbrauch"])))
                 if v.get(f"{it['key']}_tage") is not None:
-                    parts.append(f"reicht ca. {_num(round(v[it['key'] + '_tage']))} Tage")
+                    parts.append(_("reicht ca. {d} Tage", d=_num(round(v[it["key"] + "_tage"]))))
                 if parts:
                     lines.append(f"• {it['label']}: " + ", ".join(parts))
             mine = [e for e in events if e[1] == w.name]
@@ -82,10 +88,10 @@ def build(app, ha=None, now=None):
                 count = {}
                 for e in mine:
                     count[e[2]] = count.get(e[2], 0) + 1
-                lines.append(f"Störungen/Hinweise: {len(mine)}")
+                lines.append(_("Störungen/Hinweise: {n}", n=len(mine)))
                 lines += [f"• {label}" + (f" ({n}×)" if n > 1 else "") for label, n in count.items()]
             else:
-                lines.append("✅ Keine Störungen")
+                lines.append("✅ " + _("Keine Störungen"))
     finally:
         ha.close()
     return "\n".join(lines)

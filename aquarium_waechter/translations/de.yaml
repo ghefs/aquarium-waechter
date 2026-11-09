@@ -43,5 +43,8 @@ configuration:
     name: Externer MQTT-Broker (Benutzer)
   mqtt_password:
     name: Externer MQTT-Broker (Passwort)
+  sprache:
+    name: Sprache
+    description: Sprache von Dashboard, Entitäten und Meldungen. auto = wie Home Assistant (nicht unterstützte Sprachen → Englisch).
   debug:
     name: Ausführliches Log

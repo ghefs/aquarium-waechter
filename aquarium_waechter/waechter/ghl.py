@@ -12,6 +12,8 @@ import re
 import socket
 import time
 
+from .i18n import _
+
 log = logging.getLogger("waechter")
 
 
@@ -202,9 +204,10 @@ def strips_summary(strips):
     """'Steckdose 1–4: STDL4-4 (ohne Strommessung) · Steckdose 5–10: Powerbar 6E-PAB'"""
     parts, start = [], 1
     for name, count, current in strips:
-        parts.append(f"Steckdose {start}–{start + count - 1}: {name}" + ("" if current else " (ohne Strommessung)"))
+        parts.append(_("Steckdose {a}–{b}: {name}", a=start, b=start + count - 1, name=name)
+                     + ("" if current else " " + _("(ohne Strommessung)")))
         start += count
-    return " · ".join(parts) + (f" · ab Steckdose {start}: ohne Leiste durchgezählt" if parts else "")
+    return " · ".join(parts) + (" · " + _("ab Steckdose {n}: ohne Leiste durchgezählt", n=start) if parts else "")
 
 
 def parse_strips(text):
@@ -219,7 +222,7 @@ def parse_strips(text):
             continue
         current = not re.search(r"ohne\s*strom", part, re.I)
         part = re.sub(r"\(?\s*ohne\s*strom\s*\)?", "", part, flags=re.I).strip()
-        name, _, count = part.rpartition("=")
+        name, _x, count = part.rpartition("=")
         try:
             out.append((name.strip() or f"Leiste {n + 1}", int(count), current))
         except ValueError:
@@ -319,7 +322,7 @@ class Inventory:
                 if i >= 32 and not name and not self.keep(f"switch_{i}"):
                     continue  # leere Plätze der großen Ausbaustufe – trim() wirft sie ohnehin weg
                 current = g.try_get(f"GET SWITCHCHANNEL[{i}] ACTCURRENT") is not None
-                self.channels.append({"i": i, "name": name or f"Steckdose {i + 1}",
+                self.channels.append({"i": i, "name": name or _("Steckdose {n}", n=i + 1),
                                       "named": bool(name), "current": current})
             trim(self.channels, "switch", self.keep)
         self.sensors = []
@@ -333,7 +336,7 @@ class Inventory:
                     v = float(v)
                 except ValueError:
                     v = None
-                self.sensors.append({"i": i, "name": name or f"Sensor {i + 1}", "named": True,
+                self.sensors.append({"i": i, "name": name or _("Sensor {n}", n=i + 1), "named": True,
                                      "guess": guess_art(name, v)})
         self.levels = []
         if self.on("niveau"):
@@ -341,7 +344,7 @@ class Inventory:
                 if g.try_get(f"GET LEVELSENSOR[{i}] ACTSTATE") is None:
                     continue
                 name = desc(f"GET LEVELSENSOR[{i}] DESCRIPTION")
-                self.levels.append({"i": i, "name": name or f"Niveau {i + 1}", "named": bool(name)})
+                self.levels.append({"i": i, "name": name or _("Niveau {n}", n=i + 1), "named": bool(name)})
             trim(self.levels, "level", self.keep)
         self.flows = []
         if self.on("durchfluss"):
@@ -349,7 +352,7 @@ class Inventory:
                 if g.try_get(f"GET FLOWSENSOR[{i}] ACTFLOW") is None:
                     continue
                 name = desc(f"GET FLOWSENSOR[{i}] DESCRIPTION")
-                self.flows.append({"i": i, "name": name or f"Durchfluss {i + 1}", "named": bool(name)})
+                self.flows.append({"i": i, "name": name or _("Durchfluss {n}", n=i + 1), "named": bool(name)})
         self.dosers = []
         if self.on("dosierer"):
             for i in range(MAX["doser"]):
@@ -361,7 +364,7 @@ class Inventory:
                     cap = float(g.try_get(f"GET DOSER[{i}] CAPACITY") or 0)
                 except ValueError:
                     cap = 0.0
-                self.dosers.append({"i": i, "name": name or f"Dosierer {i + 1}", "named": bool(name),
+                self.dosers.append({"i": i, "name": name or _("Dosierer {n}", n=i + 1), "named": bool(name),
                                     "capacity": cap})
             trim(self.dosers, "doser", self.keep)
         self.kh = self.on("kh_director") and g.try_get("GET KHDIRECTOR ACTVALUE") is not None
@@ -373,7 +376,7 @@ class Inventory:
             for i in range(MAX["ion"]):
                 if g.try_get(f"GET IONDIRECTOR[{i}] ACTVALUE") is None:
                     break
-                self.ions.append({"i": i, "name": f"Wert {i + 1}", "named": True})
+                self.ions.append({"i": i, "name": _("Wert {n}", n=i + 1), "named": True})
         self.lights = []
         if self.on("licht"):
             for i in range(MAX["light"]):
@@ -389,7 +392,7 @@ class Inventory:
                     unused = False
                 if unused and not self.keep(f"light_{i}") and not self.cfg.get("unbenannte_abfragen"):
                     continue
-                self.lights.append({"i": i, "name": name or f"Licht {i + 1}", "named": bool(name)})
+                self.lights.append({"i": i, "name": name or _("Licht {n}", n=i + 1), "named": bool(name)})
             trim(self.lights, "light", self.keep)
         self.scanned = True
         log.info("Inventar: %d Steckdosen, %d Sensoren, %d Niveau, %d Durchfluss, %d Dosierer, "
@@ -416,16 +419,19 @@ class Inventory:
         for c in self.channels:
             strip, pos, measures = socket_pos(c["i"], self.strips)
             out.append({"key": f"switch_{c['i']}", "kind": "switch", "name": c["name"],
-                        "label": label(f"Steckdose {pos}", c), "strip": strip,
+                        "label": label(_("Steckdose {n}", n=pos), c), "strip": strip,
                         "strip_no": int(pos.split(".")[0]) if strip else 0,
                         "named": c["named"], "unit": "A", "current": c["current"] and measures, "i": c["i"]})
         for s in self.sensors:
             art = settings.get(f"sensor_{s['i']}").get("art") or s["guess"]
             for u, extra, unit, dc in SENSOR_ARTS.get(art, SENSOR_ARTS["Unbekannt"]):
                 base = s["name"]
+                extra = _(extra) if extra else ""
                 name = (f"{base} {extra}" if extra else base)
-                short = extra or ART_SHORT.get(art) or f"Sensor {s['i'] + 1}"
-                lab = base if short.lower() in base.lower() and not extra else f"{short} · {base}"
+                short = extra or (_(ART_SHORT[art]) if art in ART_SHORT else _("Sensor {n}", n=s["i"] + 1))
+                same = short.lower() in base.lower() or base.lower() in short.lower() \
+                    or (art in ART_SHORT and ART_SHORT[art].lower() in base.lower())  # GHL-Name schon deutsch
+                lab = base if same and not extra else f"{short} · {base}"
                 out.append({"key": f"sensor_{s['i']}" + ("" if u is None else f"_{u}"),
                             "kind": "value", "name": name, "label": lab,
                             "named": True, "unit": unit or "",
@@ -433,28 +439,28 @@ class Inventory:
                             "cmd": f"GET SENSOR[{s['i']}] ACTVALUE" + ("" if u is None else f"[{u}]")})
         for l in self.levels:
             out.append({"key": f"level_{l['i']}", "kind": "level", "name": l["name"],
-                        "label": label(f"Niveau {l['i'] + 1}", l),
+                        "label": label(_("Niveau {n}", n=l["i"] + 1), l),
                         "named": l["named"], "unit": "", "i": l["i"]})
         for f in self.flows:
             out.append({"key": f"flow_{f['i']}", "kind": "value", "name": f["name"], "named": f["named"],
-                        "label": label(f"Durchfluss {f['i'] + 1}", f),
+                        "label": label(_("Durchfluss {n}", n=f["i"] + 1), f),
                         "unit": "", "i": f["i"], "cmd": f"GET FLOWSENSOR[{f['i']}] ACTFLOW"})
         if self.kh:
-            out.append({"key": "kh", "kind": "value", "name": "KH", "label": "KH-Director · KH-Wert",
+            out.append({"key": "kh", "kind": "value", "name": "KH", "label": _("KH-Director · KH-Wert"),
                         "named": True, "unit": "dKH", "cmd": "GET KHDIRECTOR ACTVALUE"})
-            out.append({"key": "kh_age", "kind": "age", "name": "KH-Messung",
-                        "label": "KH-Director · letzte Messung", "named": True, "unit": "h"})
+            out.append({"key": "kh_age", "kind": "age", "name": _("KH-Messung"),
+                        "label": _("KH-Director · letzte Messung"), "named": True, "unit": "h"})
         for n in self.ions:
             out.append({"key": f"ion_{n['i']}", "kind": "value", "name": f"ION-Director {n['name']}",
                         "label": f"ION-Director · {n['name']}", "named": True, "unit": "", "i": n["i"],
                         "cmd": f"GET IONDIRECTOR[{n['i']}] ACTVALUE", "soll": f"GET IONDIRECTOR[{n['i']}] DESVALUE"})
         for d in self.dosers:
             out.append({"key": f"doser_{d['i']}", "kind": "doser", "name": d["name"],
-                        "label": label(f"Dosierer {d['i'] + 1}", d), "capacity": d.get("capacity", 0),
+                        "label": label(_("Dosierer {n}", n=d["i"] + 1), d), "capacity": d.get("capacity", 0),
                         "named": d["named"], "unit": "ml", "i": d["i"], "records": self.status_bits})
         for l in self.lights:
             out.append({"key": f"light_{l['i']}", "kind": "light", "name": l["name"],
-                        "label": label(f"Licht {l['i'] + 1}", l), "named": l["named"], "unit": "%", "i": l["i"]})
+                        "label": label(_("Licht {n}", n=l["i"] + 1), l), "named": l["named"], "unit": "%", "i": l["i"]})
         return out
 
     def read(self, items, settings):
@@ -525,7 +531,7 @@ class Inventory:
                 break  # -104 = Ende des Protokolls
             if not rec:
                 return None if r == 0 else (total, oldest)
-            t, dosed, _ = rec
+            t, dosed, _x = rec
             if t < since:
                 return total, since
             total, oldest = total + dosed, t

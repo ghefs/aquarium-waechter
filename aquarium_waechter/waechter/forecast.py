@@ -62,6 +62,20 @@ class Forecast:
             return round(rate, 1), None
         return round(rate, 1), round(ml / rate, 1)
 
+    def energy(self, uid, watts, interval):
+        """Energie aufsummieren (kWh, nur steigend). Lücken (Neustart, ProfiLux weg) zählen
+        höchstens mit zwei Abfrageintervallen."""
+        now = time.time()
+        with self.lock:
+            d = self.data.setdefault(f"{uid}/_energie", {"kwh": 0.0, "t": now})
+            dt = min(now - d["t"], 2 * interval)
+            d["kwh"] += max(0.0, watts) * max(0.0, dt) / 3600000
+            d["t"] = now
+            kwh = round(d["kwh"], 3)
+        if now - self._saved > 600:
+            self.save()
+        return kwh
+
     def save(self):
         self._saved = time.time()
         with self.lock:

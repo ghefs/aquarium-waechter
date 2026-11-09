@@ -17,6 +17,7 @@ from .ghl import CATEGORIES, CATEGORY_NAMES, MAX_STRIPS, NO_STRIP, SENSOR_ARTS, 
 from .mqtt import MqttError
 from .extern import OFF as PLUG_OFF
 from .report import OPTIONS as REPORT_OPTIONS
+from .i18n import _, back
 from .settings import LEVEL_MODES, rule
 
 log = logging.getLogger("waechter")
@@ -45,6 +46,7 @@ class Bridge:
         self.plugs = None      # Steckdosen aus HA (extern.HaPlugs)
         self.on_plug = None
         self.report_choice = lambda: "Sonntag"
+        self.voltage = lambda: 230.0
 
     # ------------------------------------------------------------ eingehend
     def _on_connect(self):
@@ -58,6 +60,8 @@ class Bridge:
 
     def _on_message(self, topic, payload):
         parts = topic.split("/")
+        if parts[-1] == "set":
+            payload = back(payload)  # angezeigte Auswahl (übersetzt) -> deutscher Schlüssel
         if len(parts) == 3 and parts[1] == "_waechter" and parts[2] in self.commands:
             self.commands[parts[2]]()
             return
@@ -117,6 +121,8 @@ class Bridge:
     def publish_field(self, dev, key, field, value):
         if field in ("enabled", "aktiv"):
             value = "ON" if value else "OFF"
+        elif field in ("mode", "art"):
+            value = _(value)
         self._pub(f"{self.prefix}/{dev.uid}/cfg/{key}/{field}", value, retain=True)
 
     def publish_settings(self, dev):
@@ -134,19 +140,19 @@ class Bridge:
         chosen = dev.leisten()
         for n in range(1, MAX_STRIPS + 1):
             v = chosen[n - 1] if n <= len(chosen) else NO_STRIP
-            self._pub(f"{self.prefix}/{dev.uid}/leiste/{n}", v, retain=True)
+            self._pub(f"{self.prefix}/{dev.uid}/leiste/{n}", _(v), retain=True)
 
     # ------------------------------------------------------------ Discovery
     def announce_waechter(self):
         dev = {"identifiers": ["aquarium_waechter"], "name": "Aquarium-Wächter",
                "manufacturer": "aquarium-waechter", "model": "Add-on"}
-        for cmd, name, icon, eid in (("dashboard", "Dashboard neu erzeugen", "mdi:view-dashboard-edit",
+        for cmd, name, icon, eid in (("dashboard", _("Dashboard neu erzeugen"), "mdi:view-dashboard-edit",
                                       "button.aquarium_waechter_dashboard_neu"),
-                                     ("telegram_test", "Test-Alarm senden", "mdi:send",
+                                     ("telegram_test", _("Test-Alarm senden"), "mdi:send",
                                       "button.aquarium_waechter_telegram_test"),
-                                     ("rescan", "Geräte neu einlesen", "mdi:refresh",
+                                     ("rescan", _("Geräte neu einlesen"), "mdi:refresh",
                                       "button.aquarium_waechter_neu_einlesen"),
-                                     ("bericht", "Wochenbericht jetzt senden", "mdi:file-chart-outline",
+                                     ("bericht", _("Wochenbericht jetzt senden"), "mdi:file-chart-outline",
                                       "button.aquarium_waechter_bericht")):
             if cmd in self.commands:
                 self._conf("button", f"aquarium_waechter_{cmd}", {
@@ -154,13 +160,13 @@ class Bridge:
                     "command_topic": f"{self.prefix}/_waechter/{cmd}", "default_entity_id": eid,
                     "availability_topic": self.avail, "device": dev})
         self._conf("binary_sensor", "aquarium_waechter_sammelstoerung", {
-            "unique_id": "aquarium_waechter_sammelstoerung", "name": "Sammelstörung", "device_class": "problem",
+            "unique_id": "aquarium_waechter_sammelstoerung", "name": _("Sammelstörung"), "device_class": "problem",
             "state_topic": f"{self.prefix}/_waechter/sammel",
             "json_attributes_topic": f"{self.prefix}/_waechter/sammel/attr",
             "default_entity_id": "binary_sensor.aquarium_waechter_sammelstoerung",
             "availability_topic": self.avail, "device": dev})
         self._conf("switch", "aquarium_waechter_wartung", {
-            "unique_id": "aquarium_waechter_wartung", "name": "Wartung – Alarme pausieren",
+            "unique_id": "aquarium_waechter_wartung", "name": _("Wartung – Alarme pausieren"),
             "icon": "mdi:wrench-clock",
             "state_topic": f"{self.prefix}/_waechter/wartung",
             "command_topic": f"{self.prefix}/_waechter/wartung/set",
@@ -168,7 +174,7 @@ class Bridge:
             "default_entity_id": "switch.aquarium_waechter_wartung",
             "availability_topic": self.avail, "device": dev})
         self._conf("number", "aquarium_waechter_wartung_dauer", {
-            "unique_id": "aquarium_waechter_wartung_dauer", "name": "Wartung – Dauer",
+            "unique_id": "aquarium_waechter_wartung_dauer", "name": _("Wartung – Dauer"),
             "icon": "mdi:timer-outline", "min": 5, "max": 480, "step": 5, "mode": "box",
             "unit_of_measurement": "min", "entity_category": "config",
             "state_topic": f"{self.prefix}/_waechter/wartung_dauer",
@@ -176,11 +182,19 @@ class Bridge:
             "default_entity_id": "number.aquarium_waechter_wartung_dauer",
             "availability_topic": self.avail, "device": dev})
         self._conf("select", "aquarium_waechter_wochenbericht", {
-            "unique_id": "aquarium_waechter_wochenbericht", "name": "Wochenbericht",
-            "icon": "mdi:calendar-week", "options": REPORT_OPTIONS, "entity_category": "config",
+            "unique_id": "aquarium_waechter_wochenbericht", "name": _("Wochenbericht"),
+            "icon": "mdi:calendar-week", "options": [_(o) for o in REPORT_OPTIONS], "entity_category": "config",
             "state_topic": f"{self.prefix}/_waechter/wochenbericht",
             "command_topic": f"{self.prefix}/_waechter/wochenbericht/set",
             "default_entity_id": "select.aquarium_waechter_wochenbericht",
+            "availability_topic": self.avail, "device": dev})
+        self._conf("number", "aquarium_waechter_spannung", {
+            "unique_id": "aquarium_waechter_spannung", "name": _("Netzspannung (für Gesamtleistung)"),
+            "icon": "mdi:sine-wave", "min": 90, "max": 260, "step": 1, "mode": "box",
+            "unit_of_measurement": "V", "entity_category": "config",
+            "state_topic": f"{self.prefix}/_waechter/spannung",
+            "command_topic": f"{self.prefix}/_waechter/spannung/set",
+            "default_entity_id": "number.aquarium_waechter_spannung",
             "availability_topic": self.avail, "device": dev})
         self.announce_plugs(dev)
         known = set(self.store_known("push"))
@@ -188,7 +202,7 @@ class Bridge:
             for phone in self.notifier.phones:
                 self._conf("switch", f"aquarium_waechter_push_{phone}", {
                     "unique_id": f"aquarium_waechter_push_{phone}",
-                    "name": f"Push an {phone_name(phone)}", "icon": "mdi:cellphone-message",
+                    "name": _("Push an {p}", p=phone_name(phone)), "icon": "mdi:cellphone-message",
                     "state_topic": f"{self.prefix}/_waechter/push/{phone}",
                     "command_topic": f"{self.prefix}/_waechter/push/{phone}/set",
                     "default_entity_id": f"switch.aquarium_waechter_push_{phone}",
@@ -208,14 +222,14 @@ class Bridge:
         known = set(self.store_known("plugs"))
         for p in self.plugs.plugs:
             u = f"aquarium_waechter_plug_{p['slug']}"
-            conf = {"unique_id": u, "name": f"{p['name']} überwachen", "icon": "mdi:power-plug-outline",
+            conf = {"unique_id": u, "name": _("{n} überwachen", n=p["name"]), "icon": "mdi:power-plug-outline",
                     "entity_category": "config",
                     "state_topic": f"{self.prefix}/_waechter/plug/{p['slug']}",
                     "command_topic": f"{self.prefix}/_waechter/plug/{p['slug']}/set",
                     "availability_topic": self.avail, "device": dev}
             if len(names) > 1:
                 self._remove("switch", u)
-                self._conf("select", u, {**conf, "options": [PLUG_OFF] + names,
+                self._conf("select", u, {**conf, "options": [_(PLUG_OFF)] + names,
                                          "default_entity_id": f"select.{u}"})
             else:
                 self._remove("select", u)
@@ -234,13 +248,16 @@ class Bridge:
         for p in self.plugs.plugs:
             owner = self.plugs.owner(p)
             if len(names) > 1:
-                v = names.get(owner, PLUG_OFF)
+                v = names.get(owner, _(PLUG_OFF))
             else:
                 v = "ON" if owner in names else "OFF"
             self._pub(f"{self.prefix}/_waechter/plug/{p['slug']}", v, retain=True)
 
+    def publish_voltage(self, volts):
+        self._pub(f"{self.prefix}/_waechter/spannung", f"{volts:.0f}", retain=True)
+
     def publish_report(self, choice):
-        self._pub(f"{self.prefix}/_waechter/wochenbericht", choice, retain=True)
+        self._pub(f"{self.prefix}/_waechter/wochenbericht", _(choice), retain=True)
 
     def publish_maintenance(self, on, until, minutes):
         self._pub(f"{self.prefix}/_waechter/wartung", "ON" if on else "OFF", retain=True)
@@ -274,7 +291,7 @@ class Bridge:
         self._pub(f"{base}/attr", {
             "anzahl": len(faults),
             "stoerungen": [f"{label}: {detail}" for label, detail in faults],
-            "text": "\n".join(f"{label}: {detail}" for label, detail in faults) or "Keine Störung"},
+            "text": "\n".join(f"{label}: {detail}" for label, detail in faults) or _("Keine Störung")},
             retain=True)
 
     def announce(self, dev):
@@ -312,13 +329,13 @@ class Bridge:
         for it in dev.items:
             k = it["key"]
             known[k] = ([("switch", f"cfg_{k}_aktiv"), ("binary_sensor", f"mon_{k}")]
-                        + [(c, sfx) for c, sfx, _ in self._measurements(it, uid)]
-                        + [(c, sfx) for c, sfx, _ in self._config_entities(it, uid)])
+                        + [(c, sfx) for c, sfx, _x in self._measurements(it, uid)]
+                        + [(c, sfx) for c, sfx, _x in self._config_entities(it, uid)])
         dev.settings.store.save()
 
         for cat in CATEGORIES:
             ent("switch", f"bereich_{cat}", {
-                "name": f"Bereich {CATEGORY_NAMES[cat]} auslesen", "payload_on": "ON", "payload_off": "OFF",
+                "name": _("Bereich {b} auslesen", b=_(CATEGORY_NAMES[cat])), "payload_on": "ON", "payload_off": "OFF",
                 "state_on": "ON", "state_off": "OFF", "icon": "mdi:format-list-checks", "entity_category": "config",
                 "state_topic": f"{base}/bereich/{cat}", "command_topic": f"{base}/bereich/{cat}/set"},
                 f"switch.{uid}_bereich_{cat}", live=False)
@@ -331,18 +348,31 @@ class Bridge:
                 gone("select", f"leiste_{n}")
                 continue
             ent("select", f"leiste_{n}", {
-                "name": f"Leiste {n}", "icon": "mdi:power-socket-eu", "entity_category": "config",
-                "options": [NO_STRIP] + list(STRIP_TYPES),
+                "name": _("Leiste {n}", n=n), "icon": "mdi:power-socket-eu", "entity_category": "config",
+                "options": [_(o) for o in [NO_STRIP] + list(STRIP_TYPES)],
                 "state_topic": f"{base}/leiste/{n}", "command_topic": f"{base}/leiste/{n}/set"},
                 f"select.{uid}_leiste_{n}", live=False)
 
         ent("binary_sensor", "sammelstoerung", {
-            "name": "Sammelstörung", "device_class": "problem", "state_topic": f"{base}/sammel",
+            "name": _("Sammelstörung"), "device_class": "problem", "state_topic": f"{base}/sammel",
             "json_attributes_topic": f"{base}/sammel/attr"},
             f"binary_sensor.{uid}_sammelstoerung", live=False)
 
+        if dev.has_power():
+            ent("sensor", "gesamt_leistung", {
+                "name": _("Gesamtleistung (ca.)"), "device_class": "power", "unit_of_measurement": "W",
+                "state_class": "measurement", "suggested_display_precision": 0, "state_topic": st,
+                "value_template": tpl("gesamt_w")}, f"sensor.{uid}_gesamt_leistung")
+            ent("sensor", "gesamt_energie", {
+                "name": _("Energie (ca.)"), "device_class": "energy", "unit_of_measurement": "kWh",
+                "state_class": "total_increasing", "suggested_display_precision": 2, "state_topic": st,
+                "value_template": tpl("gesamt_kwh")}, f"sensor.{uid}_gesamt_energie")
+        else:
+            gone("sensor", "gesamt_leistung")
+            gone("sensor", "gesamt_energie")
+
         ent("binary_sensor", "ghl_connected", {
-            "name": "Verbindung", "device_class": "connectivity", "entity_category": "diagnostic",
+            "name": _("Verbindung"), "device_class": "connectivity", "entity_category": "diagnostic",
             "state_topic": f"{base}/connected"}, f"binary_sensor.{uid}_verbindung", live=False)
 
         for it in dev.items:
@@ -352,17 +382,17 @@ class Bridge:
                                "command_topic": f"{base}/cfg/{key}/{f}/set", "entity_category": "config"}
             # Schalter "Abfragen" gibt es immer
             ent("switch", f"cfg_{key}_aktiv", {
-                "name": f"{name} – auslesen", "payload_on": "ON", "payload_off": "OFF",
+                "name": f"{name} – {_('auslesen')}", "payload_on": "ON", "payload_off": "OFF",
                 "state_on": "ON", "state_off": "OFF", "icon": "mdi:eye", **cfg_t("aktiv")},
                 f"switch.{uid}_{key}_abfragen", live=False)
 
             measure = self._measurements(it, uid)
             cfgs = self._config_entities(it, uid)
             if not s["aktiv"]:
-                for comp, suffix, _ in measure:
+                for comp, suffix, _x in measure:
                     gone(comp, suffix)
                 gone("binary_sensor", f"mon_{key}")
-                for comp, suffix, _ in cfgs:
+                for comp, suffix, _x in cfgs:
                     gone(comp, suffix)
                 continue
             for comp, suffix, conf in measure:
@@ -372,7 +402,7 @@ class Bridge:
                 gone("binary_sensor", f"mon_{key}")
                 continue
             ent("binary_sensor", f"mon_{key}", {
-                "name": f"{name} – Störung", "device_class": "problem",
+                "name": f"{name} – {_('Störung')}", "device_class": "problem",
                 "state_topic": f"{base}/mon/{key}", "json_attributes_topic": f"{base}/mon/{key}/attr"},
                 f"binary_sensor.{uid}_{key}_stoerung")
             if kind in ("age", "doser"):
@@ -409,7 +439,7 @@ class Bridge:
                 "payload_on": "ON", "payload_off": "OFF"})]
             if it["current"]:
                 out.append(("sensor", f"{key}_current", {
-                    "name": f"{name} – Strom", "device_class": "current", "unit_of_measurement": "A",
+                    "name": f"{name} – {_('Strom')}", "device_class": "current", "unit_of_measurement": "A",
                     "state_class": "measurement", "suggested_display_precision": 3,
                     "value_template": tpl(f"{key}_current")}))
             return out
@@ -424,7 +454,7 @@ class Bridge:
             out = [("sensor", key, {"name": name, "value_template": tpl(key), **base})]
             if it.get("main") or key == "kh":
                 out.append(("sensor", f"{key}_soll", {
-                    "name": f"{name} – Sollwert", "entity_category": "diagnostic",
+                    "name": f"{name} – {_('Sollwert')}", "entity_category": "diagnostic",
                     "value_template": tpl(f"{key}_soll"),
                     **{k: v for k, v in base.items() if k != "state_class"}}))
             return out
@@ -434,30 +464,30 @@ class Bridge:
             return []  # Zustand und Leistung kommen direkt von der HA-Steckdose
         if kind == "doser":
             out = [("sensor", key, {
-                "name": f"{name} – Füllstand", "device_class": "volume_storage", "unit_of_measurement": "mL",
+                "name": f"{name} – {_('Füllstand')}", "device_class": "volume_storage", "unit_of_measurement": "mL",
                 "state_class": "measurement", "suggested_display_precision": 0, "icon": "mdi:cup-water",
                 "value_template": tpl(key)})]
             if it.get("capacity"):
                 out.append(("sensor", f"{key}_pct", {
-                    "name": f"{name} – Füllstand %", "unit_of_measurement": "%", "state_class": "measurement",
+                    "name": f"{name} – {_('Füllstand')} %", "unit_of_measurement": "%", "state_class": "measurement",
                     "suggested_display_precision": 0, "icon": "mdi:cup-water",
                     "value_template": tpl(f"{key}_pct")}))
             if it.get("capacity") or it.get("records"):
                 out.append(("sensor", f"{key}_verbrauch", {
-                    "name": f"{name} – Verbrauch", "unit_of_measurement": "mL/d", "state_class": "measurement",
+                    "name": f"{name} – {_('Verbrauch')}", "unit_of_measurement": "mL/d", "state_class": "measurement",
                     "suggested_display_precision": 1, "icon": "mdi:chart-line-variant",
                     "value_template": tpl(f"{key}_verbrauch")}))
             if it.get("capacity"):
                 out.append(("sensor", f"{key}_tage", {
-                    "name": f"{name} – reicht noch", "unit_of_measurement": "d", "device_class": "duration",
+                    "name": f"{name} – {_('reicht noch')}", "unit_of_measurement": "d", "device_class": "duration",
                     "state_class": "measurement", "suggested_display_precision": 0,
                     "icon": "mdi:calendar-clock", "value_template": tpl(f"{key}_tage")}))
             if it.get("records"):
                 out.append(("sensor", f"{key}_letzte", {
-                    "name": f"{name} – letzte Dosierung", "device_class": "timestamp",
+                    "name": f"{name} – {_('letzte Dosierung')}", "device_class": "timestamp",
                     "value_template": tpl(f"{key}_last_iso")}))
                 out.append(("sensor", f"{key}_dosiert", {
-                    "name": f"{name} – zuletzt dosiert", "device_class": "volume", "unit_of_measurement": "mL",
+                    "name": f"{name} – {_('zuletzt dosiert')}", "device_class": "volume", "unit_of_measurement": "mL",
                     "suggested_display_precision": 1, "icon": "mdi:water-plus",
                     "value_template": tpl(f"{key}_dosiert")}))
             return out
@@ -489,7 +519,7 @@ class Bridge:
 
     @classmethod
     def label_of(cls, kind, field):
-        return cls.LABELS.get((kind, field)) or cls.LABELS.get(field)
+        return _(cls.LABELS.get((kind, field)) or cls.LABELS.get(field))
 
     @classmethod
     def _config_entities(cls, it, uid):
@@ -506,7 +536,7 @@ class Bridge:
         out = []
         if kind == "level":
             out.append(("select", f"cfg_{key}_mode", {"name": f"{name} – {cls.label_of(kind, 'mode')}",
-                                                      "options": LEVEL_MODES}))
+                                                      "options": [_(o) for o in LEVEL_MODES]}))
         else:
             out.append(("switch", f"cfg_{key}_enabled", {
                 "name": f"{name} – {cls.label_of(kind, 'enabled')}", "payload_on": "ON", "payload_off": "OFF",
@@ -523,7 +553,7 @@ class Bridge:
             out.append(num(0, 1440, 1, "min", "delay"))
         if kind == "value" and it.get("main"):
             out.append(("select", f"cfg_{key}_art", {"name": f"{name} – {cls.label_of(kind, 'art')}",
-                                                     "options": list(SENSOR_ARTS),
+                                                     "options": [_(o) for o in SENSOR_ARTS],
                                                      "icon": "mdi:format-list-bulleted-type"}))
         return out
 

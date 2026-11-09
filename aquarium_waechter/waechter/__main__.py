@@ -20,7 +20,9 @@ from .forecast import Forecast
 from .ghl import GhlClient, Inventory, ReadError, strips_from_choice
 from .haws import HaWs
 from .mqtt import Mqtt, MqttError
-from .notify import Notifier
+from . import i18n
+from .i18n import _
+from .notify import Notifier, ha_language
 from . import report
 from .settings import REMINDER, SettingsStore, evaluate, fmt
 
@@ -123,22 +125,25 @@ class DeviceWorker(threading.Thread):
         Einstellungen bleiben ebenfalls – aber wir melden es, damit Grenzwerte
         geprüft werden. Eine laufende Störung wird zurückgesetzt."""
         names = self.app.store.data.setdefault("namen", {}).setdefault(self.uid, {})
+        # Sprache gewechselt -> Standardnamen („Steckdose 3“ / „Socket 3“) ändern sich, das ist keine Umbelegung
+        same_lang = names.get("_sprache", "de") == i18n.LANG
+        names["_sprache"] = i18n.LANG
         changed = []
         for it in self.items:
             old = names.get(it["key"])
-            if old is not None and old != it["name"]:
+            if old is not None and old != it["name"] and same_lang and it["kind"] != "plug":
                 st = self.settings.get(it["key"])
                 info = ""
                 if st.get("enabled"):
                     lim = [f"{l} {fmt(st[f])}" for l, f in (("Min", "min"), ("Max", "max")) if st.get(f)]
-                    info = f" – Überwachung bleibt an ({', '.join(lim) or 'Standardwerte'}), bitte prüfen"
+                    info = _(" – Überwachung bleibt an ({lim}), bitte prüfen", lim=", ".join(lim) or _("Standardwerte"))
                 prefix = it["label"].split(" · ")[0]
                 changed.append(f"• {prefix}: {old} → {it['name']}{info}")
                 self.faults.pop(it["key"], None)
             names[it["key"]] = it["name"]
         self.app.store.save()
         if changed:
-            self.notify("Belegung geändert", "\n".join(changed))
+            self.notify(_("Belegung geändert"), "\n".join(changed))
 
     def run(self):
         opts = self.app.opts
@@ -164,6 +169,7 @@ class DeviceWorker(threading.Thread):
                 self.reachable(True)
                 values.update(plugs)
                 self.add_forecast(values)
+                self.add_power(values)
                 self.last_values = values
                 self.app.bridge.values(self, values)
                 self.check(values)
@@ -181,6 +187,26 @@ class DeviceWorker(threading.Thread):
                 log.exception("%s: unerwarteter Fehler", self.name)
             self.wake.wait(max(1, interval - (time.time() - start)))
             self.wake.clear()
+
+    def has_power(self):
+        """Gibt es etwas, dessen Leistung wir kennen (Steckdosen mit Strommessung, HA-Steckdosen)?"""
+        return any((it["kind"] == "switch" and it.get("current")) or it["kind"] == "plug" for it in self.items)
+
+    def add_power(self, values):
+        """Gesamtleistung ≈ Summe der Ströme × Netzspannung + Leistung der HA-Steckdosen; Energie aufsummieren."""
+        if not self.has_power():
+            return
+        volts = self.app.voltage()
+        watts = 0.0
+        for it in self.items:
+            if not self.settings.get(it["key"])["aktiv"]:
+                continue
+            if it["kind"] == "switch" and it.get("current") and values.get(f"{it['key']}_state") == "ON":
+                watts += (values.get(f"{it['key']}_current") or 0.0) * volts
+            elif it["kind"] == "plug" and values.get(f"{it['key']}_state") == "ON":
+                watts += values.get(f"{it['key']}_power") or 0.0
+        values["gesamt_w"] = round(watts, 1)
+        values["gesamt_kwh"] = self.app.forecast.energy(self.uid, watts, int(self.app.opts.get("intervall", 60)))
 
     def add_forecast(self, values):
         """Verbrauch je Tag und „reicht noch … Tage“ je Dosierbehälter.
@@ -207,7 +233,7 @@ class DeviceWorker(threading.Thread):
                     self.dose_rate[key] = (r, now)
                 rate = r
             if it.get("capacity"):
-                fl_rate, _ = self.app.forecast.add(self.uid, key, ml, it["capacity"], now)
+                fl_rate, _x = self.app.forecast.add(self.uid, key, ml, it["capacity"], now)
                 rate = rate if rate is not None else fl_rate
             if rate is None:
                 continue
@@ -219,7 +245,7 @@ class DeviceWorker(threading.Thread):
         """Sammelstörung dieses Geräts (und über alle Geräte) nach HA melden."""
         faults = list(self.active)
         if self.unreachable_alerted:
-            faults.insert(0, ("ProfiLux nicht erreichbar", f"keine Antwort von {self.host}"))
+            faults.insert(0, (_("ProfiLux nicht erreichbar"), _("keine Antwort von {h}", h=self.host)))
         try:
             self.app.bridge.summary(self.uid, faults)
             self.app.publish_summary()
@@ -235,7 +261,7 @@ class DeviceWorker(threading.Thread):
         if ok:
             was = self.unreachable_alerted
             if was:
-                self.notify("Wieder erreichbar", f"{self.host} antwortet wieder.", kind="ok")
+                self.notify(_("Wieder erreichbar"), _("{h} antwortet wieder.", h=self.host), kind="ok")
             self.unreachable_since, self.unreachable_alerted = None, False
             if was:
                 self.publish_summary()
@@ -245,9 +271,10 @@ class DeviceWorker(threading.Thread):
         if (not self.unreachable_alerted and not self.app.maintenance()
                 and now - self.unreachable_since >= int(opts.get("nicht_erreichbar_nach", 600))):
             self.unreachable_alerted = True
-            self.app.log_event(self.name, "ProfiLux nicht erreichbar", "STÖRUNG")
-            self.notify("ProfiLux nicht erreichbar",
-                        f"Seit {int((now - self.unreachable_since) / 60)} min keine Antwort von {self.host}.",
+            self.app.log_event(self.name, _("ProfiLux nicht erreichbar"), "STÖRUNG")
+            self.notify(_("ProfiLux nicht erreichbar"),
+                        _("Seit {m} min keine Antwort von {h}.", m=int((now - self.unreachable_since) / 60),
+                          h=self.host),
                         urgent=True)
             self.publish_summary()
 
@@ -282,17 +309,17 @@ class DeviceWorker(threading.Thread):
                     pass  # Wartung: nichts melden; steht die Störung danach noch an, kommt der Alarm dann
                 elif not f["alerted"] and now - f["since"] >= delay:
                     f["alerted"], f["last"] = True, now
-                    title = "Nachfüllen" if it["kind"] == "doser" else "STÖRUNG"
+                    title = _("Nachfüllen") if it["kind"] == "doser" else _("STÖRUNG")
                     self.notify(f"{title}: {it['label']}", detail, urgent=it["kind"] != "doser")
                     self.app.log_event(self.name, it["label"], title)
                 elif f["alerted"] and every and now - f["last"] >= every:
                     f["last"] = now
                     mins = int((now - f["since"]) / 60)
-                    self.notify(f"Noch immer: {it['label']}", f"{detail} (seit {mins} min)",
+                    self.notify(_("Noch immer: {l}", l=it["label"]), _("{d} (seit {m} min)", d=detail, m=mins),
                                 urgent=it["kind"] != "doser")
             elif f and ok is not None:
                 if f["alerted"]:
-                    self.notify(f"Wieder OK: {it['label']}", detail, kind="ok")
+                    self.notify(_("Wieder OK: {l}", l=it["label"]), detail, kind="ok")
                 self.faults.pop(key, None)
             pending = bool(f) and not f["alerted"] if fault else False
             try:
@@ -306,6 +333,15 @@ class App:
         self.opts = opts
         self.data_dir = Path(data_dir)
         self.store = SettingsStore(self.data_dir / "einstellungen.json")
+        # Sprache: Option „sprache“, sonst wie Home Assistant (nicht unterstützt -> Englisch).
+        # HA beim Start nicht erreichbar -> zuletzt erkannte Sprache (Namen sollen nicht umspringen).
+        choice = opts.get("sprache") or "auto"
+        if choice == "auto":
+            choice = ha_language(tries=24 if os.environ.get("SUPERVISOR_TOKEN") else 1) \
+                or self.store.data.get("sprache") or "en"
+        self.store.data["sprache"] = i18n.set_lang(choice)
+        self.store.save()
+        log.info("Sprache: %s", i18n.LANG)
         self.forecast = Forecast(self.data_dir / "verbrauch.json")
         self.plugs = HaPlugs(self.store)
         self.notifier = Notifier(opts.get("telegram_chat_id"), opts.get("telegram_token") or None,
@@ -323,7 +359,9 @@ class App:
         self.bridge.plugs = self.plugs
         self.bridge.on_plug = self._plug_changed
         self.bridge.report_choice = self.report_choice
-        self.bridge.commands_set = {"wartung": self._set_maintenance,
+        self.bridge.voltage = self.voltage
+        self.bridge.commands_set = {"spannung": self._set_voltage,
+                                    "wartung": self._set_maintenance,
                                     "wartung_dauer": self._set_maintenance_minutes,
                                     "wochenbericht": self._set_report}
         self.dashboard_dirty = threading.Event()
@@ -332,7 +370,7 @@ class App:
         self.bridge.commands["rescan"] = self._rescan
         self.bridge.commands["bericht"] = lambda: self._send_report(manual=True)
         self.bridge.commands["telegram_test"] = lambda: self.notifier.send(
-            "Test", "Der Aquarium-Wächter kann dich erreichen. So sieht ein Alarm aus.", urgent=True)
+            _("Test"), _("Der Aquarium-Wächter kann dich erreichen. So sieht ein Alarm aus."), urgent=True)
         self.workers = []
         seen = set()
         for i, d in enumerate(opts.get("geraete") or []):
@@ -349,7 +387,7 @@ class App:
         faults = []
         for w in self.workers:
             if w.unreachable_alerted:
-                faults.append((f"{w.name} · ProfiLux nicht erreichbar", f"keine Antwort von {w.host}"))
+                faults.append((f"{w.name} · {_('ProfiLux nicht erreichbar')}", _("keine Antwort von {h}", h=w.host)))
             faults += [(f"{w.name} · {label}", detail) for label, detail in w.active]
         self.bridge.summary("_waechter", faults)
 
@@ -364,6 +402,20 @@ class App:
 
     def events(self):
         return list(self.store.data.get("ereignisse", []))
+
+    def voltage(self):
+        return float(self.store.data.get("spannung") or 230)
+
+    def _set_voltage(self, raw):
+        try:
+            self.store.data["spannung"] = max(90.0, min(260.0, float(raw)))
+            self.store.save()
+        except ValueError:
+            pass
+        try:
+            self.bridge.publish_voltage(self.voltage())
+        except MqttError:
+            pass
 
     def report_choice(self):
         v = self.store.data.get("wochenbericht")
@@ -382,7 +434,7 @@ class App:
     def _send_report(self, manual=False):
         def run():
             try:
-                self.notifier.send("Wochenbericht", report.build(self))
+                self.notifier.send(_("Wochenbericht"), report.build(self))
             except Exception:
                 log.exception("Wochenbericht nicht erstellt")
         if not manual:
@@ -428,8 +480,9 @@ class App:
             until = time.time() + self.maintenance_minutes() * 60
             self.store.data["wartung_bis"] = until
             self.store.save()
-            self.notifier.send("Wartung", f"Alarme pausiert bis {time.strftime('%H:%M', time.localtime(until))} "
-                               f"({self.maintenance_minutes()} min). Danach wird wieder überwacht.")
+            self.notifier.send(_("Wartung"), _("Alarme pausiert bis {t} ({m} min). Danach wird wieder überwacht.",
+                                               t=time.strftime("%H:%M", time.localtime(until)),
+                                               m=self.maintenance_minutes()))
         else:
             self._end_maintenance(early=True)
         self._publish_maintenance()
@@ -448,8 +501,9 @@ class App:
             return
         self.store.data["wartung_bis"] = 0
         self.store.save()
-        self.notifier.send("Wartung beendet", "Überwachung wieder aktiv." +
-                           (" Noch anstehende Störungen werden jetzt gemeldet." if not early else ""), kind="ok")
+        self.notifier.send(_("Wartung beendet"), _("Überwachung wieder aktiv.") +
+                           (" " + _("Noch anstehende Störungen werden jetzt gemeldet.") if not early else ""),
+                           kind="ok")
         for w in self.workers:
             w.wake.set()
 
@@ -496,12 +550,13 @@ class App:
         self.refresh_plugs()
         try:
             self.bridge.publish_report(self.report_choice())
+            self.bridge.publish_voltage(self.voltage())
         except MqttError:
             pass
         for w in self.workers:
             w.start()
         if self.opts.get("start_meldung", False):
-            self.notifier.send("Wächter gestartet", ", ".join(f"{w.name} ({w.host})" for w in self.workers))
+            self.notifier.send(_("Add-on gestartet"), ", ".join(f"{w.name} ({w.host})" for w in self.workers))
         while True:
             self.mqtt.loop(5)
             if self.store.data.get("wartung_bis") and not self.maintenance():

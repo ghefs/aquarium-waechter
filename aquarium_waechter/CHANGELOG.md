@@ -3,6 +3,19 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.5.0
+
+- **Fünf Sprachen / five languages:** Deutsch, English, Français, Español, Italiano.
+  Dashboard, Entitätsnamen, Einstellungen, Alarme und Wochenbericht kommen automatisch in der
+  Sprache von Home Assistant (nicht unterstützte Sprachen → Englisch). Fest einstellbar mit der
+  Option `sprache`. Einstellungen bleiben beim Sprachwechsel erhalten; Entitäts-IDs ändern sich nicht.
+  Danach einmal „Dashboard neu erzeugen“, falls das Dashboard von Hand geändert wurde.
+- Konfigurationsseite des Add-ons ebenfalls in allen fünf Sprachen.
+- **Gesamtleistung und Energie** je ProfiLux: `sensor.<gerät>_gesamt_leistung` (W) und
+  `sensor.<gerät>_gesamt_energie` (kWh, fürs Energie-Dashboard von HA). Näherung: Summe der
+  gemessenen Ströme × Netzspannung (einstellbar, Standard 230 V) plus Leistung der übernommenen
+  HA-Steckdosen. Steckdosen ohne Strommessung zählen nicht mit. Im Wochenbericht: Ø-Leistung und kWh.
+
 ## 4.4.0
 
 - **Dosierbehälter: „reicht noch … Tage“.** Das Add-on rechnet den Verbrauch je Tag aus

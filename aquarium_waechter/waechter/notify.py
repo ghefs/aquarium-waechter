@@ -41,6 +41,20 @@ def _ha(method, path, body=None):
         return json.loads(r.read() or b"null")
 
 
+def ha_language(tries=24):
+    """Sprache von Home Assistant (z. B. "de", "en-GB" -> "en"); None, wenn nicht abfragbar."""
+    import time
+    for attempt in range(tries):  # beim Hochfahren startet das Add-on oft vor Home Assistant
+        try:
+            return (_ha("GET", "/config") or {}).get("language")
+        except Exception as e:
+            if attempt == tries - 1:
+                log.info("Sprache von Home Assistant nicht abfragbar: %s", e)
+            else:
+                time.sleep(5)
+    return None
+
+
 def app_devices():
     """Alle Handys mit HA-App (Dienste notify.mobile_app_*)."""
     try:

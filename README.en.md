@@ -36,12 +36,15 @@ phone (HA companion app and/or Telegram):
   **Shelly Plug S** (or any other plug with power metering)? Switch it on in the settings
   page – it shows up in the dashboard and is monitored like a ProfiLux socket (power too
   low/too high, unreachable).
+- **Total power and energy** of the aquarium (W, kWh – also for the HA energy dashboard).
 - **Weekly report** to your phone: mean/min/max of all readings, consumption and supply
   of the dosing containers, faults of the week.
 - **Maintenance mode:** one switch pauses all alarms while you work on the tank;
   it switches itself off after the set time.
 - **Everything configurable in HA:** what is read, what is monitored, limits.
 - **Dashboard is created automatically** – an overview and a settings page per ProfiLux.
+- **Five languages:** English, Deutsch, Français, Español, Italiano – dashboard, entities and
+  messages automatically follow the Home Assistant language (option `sprache`).
 - **Collective fault sensor** (`binary_sensor.aquarium_waechter_sammelstoerung`) for
   your own automations – flash a light, sound a siren, make an announcement.
 - Any number of ProfiLux units, each with its own equipment. Everything present is

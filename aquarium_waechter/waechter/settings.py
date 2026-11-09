@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from .ghl import NO_STRIP, SENSOR_ARTS
+from .i18n import _, dec
 
 log = logging.getLogger("waechter")
 
@@ -171,8 +172,8 @@ class SettingsStore:
 
 
 def fmt(v, unit=""):
-    """Zahl deutsch formatiert, ohne überflüssige Nullen: 0,25 A"""
-    return f"{v:.3f}".rstrip("0").rstrip(".").replace(".", ",") + (f" {unit}" if unit else "")
+    """Zahl ohne überflüssige Nullen, Dezimaltrennzeichen je Sprache: 0,25 A / 0.25 A"""
+    return f"{v:.3f}".rstrip("0").rstrip(".").replace(".", dec()) + (f" {unit}" if unit else "")
 
 
 de = fmt
@@ -182,141 +183,149 @@ def rule(item, st):
     """Klartext, wann ein Alarm kommt – steht im Dashboard neben den Einstellungen."""
     kind, unit = item["kind"], item.get("unit", "")
     if not st["aktiv"]:
-        return "Wird nicht ausgelesen."
+        return _("Wird nicht ausgelesen.")
     if kind == "light":
-        return "Nur Anzeige (kein Alarm – die Helligkeit ändert sich über den Tag)."
-    later = f", wenn das länger als {de(st['delay'])} min anhält" if st.get("delay") else " (sofort)"
+        return _("Nur Anzeige (kein Alarm – die Helligkeit ändert sich über den Tag).")
+    off = _("Kein Alarm (Überwachung aus).")
+    later = (_(", wenn das länger als {d} min anhält", d=de(st["delay"])) if st.get("delay")
+             else " " + _("(sofort)"))
     if kind == "switch":
         if not item.get("current"):
-            return "Nur Anzeige an/aus – diese Steckdose misst keinen Strom, daher kein Alarm möglich."
+            return _("Nur Anzeige an/aus – diese Steckdose misst keinen Strom, daher kein Alarm möglich.")
         if not st["enabled"]:
-            return "Kein Alarm (Überwachung aus)."
-        txt = f"Alarm, wenn die Steckdose AN ist, aber weniger als {de(st['min'], 'A')} fließen (Gerät läuft nicht)"
+            return off
+        txt = _("Alarm, wenn die Steckdose AN ist, aber weniger als {v} fließen (Gerät läuft nicht)",
+                v=de(st["min"], "A"))
         if st["max"] > 0:
-            txt += f" oder mehr als {de(st['max'], 'A')}"
+            txt += _(" oder mehr als {v}", v=de(st["max"], "A"))
         return txt + later + "."
     if kind == "plug":
         if not st["enabled"]:
-            return "Kein Alarm (Überwachung aus)."
-        txt = f"Alarm, wenn das Gerät AN ist, aber weniger als {de(st['min'], 'W')} zieht (läuft nicht)"
+            return off
+        txt = _("Alarm, wenn das Gerät AN ist, aber weniger als {v} zieht (läuft nicht)", v=de(st["min"], "W"))
         if st["max"] > 0:
-            txt += f" oder mehr als {de(st['max'], 'W')}"
-        return txt + ", oder wenn die Steckdose in Home Assistant nicht erreichbar ist" + later + "."
+            txt += _(" oder mehr als {v}", v=de(st["max"], "W"))
+        return txt + _(", oder wenn die Steckdose in Home Assistant nicht erreichbar ist") + later + "."
     if kind == "level":
         if st["mode"] == "Aus":
-            return "Kein Alarm (Auswahl „Alarm bei“ steht auf Aus)."
-        return f"Alarm, wenn der Niveausensor {st['mode'][-1]} meldet{later}."
+            return _("Kein Alarm (Auswahl „Alarm bei“ steht auf Aus).")
+        return _("Alarm, wenn der Niveausensor {n} meldet", n=st["mode"][-1]) + later + "."
     if kind == "age":
         if not st["enabled"]:
-            return "Kein Alarm (Überwachung aus)."
-        return (f"Alarm, wenn der KH-Director länger als {de(st['max'], 'h')} nicht gemessen hat "
-                "(sowie bei Leck- oder Messbereichsalarm, ab ProfiLux-Firmware 7.52).")
+            return off
+        return _("Alarm, wenn der KH-Director länger als {h} nicht gemessen hat "
+                 "(sowie bei Leck- oder Messbereichsalarm, ab ProfiLux-Firmware 7.52).", h=de(st["max"], "h"))
     if kind == "doser":
         if not item.get("capacity"):
-            return "Nur Anzeige – im ProfiLux ist für diesen Behälter keine Größe eingetragen, der Füllstand wird dort nicht geführt. Für die Meldung „Nachfüllen“ in GHL Connect die Behältergröße eintragen und danach „Geräte neu einlesen“."
+            return _("Nur Anzeige – im ProfiLux ist für diesen Behälter keine Größe eingetragen, der Füllstand "
+                     "wird dort nicht geführt. Für die Meldung „Nachfüllen“ in GHL Connect die Behältergröße "
+                     "eintragen und danach „Geräte neu einlesen“.")
         if not st["enabled"]:
-            return "Kein Alarm (Überwachung aus)."
-        txt = f"Meldung „Nachfüllen“, wenn weniger als {de(st['min'], 'ml')} im Behälter sind"
+            return off
+        txt = _("Meldung „Nachfüllen“, wenn weniger als {v} im Behälter sind", v=de(st["min"], "ml"))
         if st.get("tage"):
-            txt += f" oder der Vorrat nur noch für weniger als {de(st['tage'])} Tage reicht"
-        return txt + " (1× täglich)."
+            txt += _(" oder der Vorrat nur noch für weniger als {d} Tage reicht", d=de(st["tage"]))
+        return txt + " " + _("(1× täglich).")
     if not st["enabled"]:
-        return "Kein Alarm (Überwachung aus)."
+        return off
     if st["min"] >= st["max"]:
-        return "⚠️ Grenzen ungültig: Minimum muss kleiner als Maximum sein."
-    return f"Alarm, wenn der Wert unter {de(st['min'], unit)} oder über {de(st['max'], unit)} liegt{later}."
+        return _("⚠️ Grenzen ungültig: Minimum muss kleiner als Maximum sein.")
+    return _("Alarm, wenn der Wert unter {lo} oder über {hi} liegt", lo=de(st["min"], unit),
+             hi=de(st["max"], unit)) + later + "."
 
 
 def evaluate(item, st, values):
     """-> (watched, ok, detail); ok=None = kein Wert."""
     key, kind, unit = item["key"], item["kind"], item.get("unit", "")
+    nv = _("kein Wert")
     if not st["aktiv"]:
-        return False, True, "nicht abgefragt"
+        return False, True, _("nicht abgefragt")
     if kind == "switch":
         watched = st["enabled"] and item.get("current", False)
         state, cur = values.get(f"{key}_state"), values.get(f"{key}_current")
         if state is None:
-            return watched, None, "kein Wert"
+            return watched, None, nv
         if state == "OFF":
-            return watched, True, "aus"
+            return watched, True, _("aus")
         if cur is None:
-            return watched, True, "an"
+            return watched, True, _("an")
         if cur < st["min"]:
-            return watched, False, f"Steckdose an, aber nur {fmt(cur, 'A')} (Minimum {fmt(st['min'], 'A')})"
+            return watched, False, _("Steckdose an, aber nur {v} (Minimum {m})", v=fmt(cur, "A"), m=fmt(st["min"], "A"))
         if st["max"] > 0 and cur > st["max"]:
-            return watched, False, f"Strom zu hoch: {fmt(cur, 'A')} (Maximum {fmt(st['max'], 'A')})"
-        return watched, True, f"an, {fmt(cur, 'A')}"
+            return watched, False, _("Strom zu hoch: {v} (Maximum {m})", v=fmt(cur, "A"), m=fmt(st["max"], "A"))
+        return watched, True, _("an, {v}", v=fmt(cur, "A"))
     if kind == "plug":
         watched = st["enabled"]
         if f"{key}_state" not in values:  # Home Assistant selbst nicht abfragbar (z. B. Neustart)
-            return watched, None, "kein Wert"
+            return watched, None, nv
         state, w = values.get(f"{key}_state"), values.get(f"{key}_power")
         if state is None:
-            return watched, False, "in Home Assistant nicht erreichbar"
+            return watched, False, _("in Home Assistant nicht erreichbar")
         if state == "OFF":
-            return watched, True, "aus"
+            return watched, True, _("aus")
         if w is None:
-            return watched, True, "an"
+            return watched, True, _("an")
         if w < st["min"]:
-            return watched, False, f"an, aber nur {fmt(w, 'W')} (Minimum {fmt(st['min'], 'W')})"
+            return watched, False, _("an, aber nur {v} (Minimum {m})", v=fmt(w, "W"), m=fmt(st["min"], "W"))
         if st["max"] > 0 and w > st["max"]:
-            return watched, False, f"Leistung zu hoch: {fmt(w, 'W')} (Maximum {fmt(st['max'], 'W')})"
-        return watched, True, f"an, {fmt(w, 'W')}"
+            return watched, False, _("Leistung zu hoch: {v} (Maximum {m})", v=fmt(w, "W"), m=fmt(st["max"], "W"))
+        return watched, True, _("an, {v}", v=fmt(w, "W"))
     if kind == "light":
         v = values.get(key)
-        return False, True if v is not None else None, "kein Wert" if v is None else fmt(v, "%")
+        return False, True if v is not None else None, nv if v is None else fmt(v, "%")
     if kind == "level":
         watched = st["mode"] != "Aus"
         v = values.get(key)
         if v is None:
-            return watched, None, "kein Wert"
+            return watched, None, nv
         if watched and v == int(st["mode"][-1]):
-            return watched, False, f"Niveausensor meldet {v}"
-        return watched, True, f"Zustand {v}"
+            return watched, False, _("Niveausensor meldet {v}", v=v)
+        return watched, True, _("Zustand {v}", v=v)
     if kind == "age":
         watched, t = st["enabled"], values.get("kh_last")
         status = values.get("kh_status") or 0
         if status & 128:
-            return watched, False, "KH-Director meldet LECK-Alarm!"
+            return watched, False, _("KH-Director meldet LECK-Alarm!")
         if status & 32:
-            return watched, False, "KH-Director meldet Messbereichsalarm (Wert außerhalb des Bereichs)"
+            return watched, False, _("KH-Director meldet Messbereichsalarm (Wert außerhalb des Bereichs)")
         if t is None:
-            return watched, None, "kein Wert"
+            return watched, None, nv
         age = (time.time() - t) / 3600
-        when = datetime.datetime.fromtimestamp(t).strftime("%d.%m. %H:%M")
+        when = datetime.datetime.fromtimestamp(t).strftime(_("%d.%m. %H:%M"))
         if age > st["max"]:
-            return watched, False, (f"Letzte Messung vor {fmt(round(age, 1), 'h')} ({when}) – "
-                                    f"Reagenz/Referenz leer oder Director gestört?")
-        return watched, True, f"vor {fmt(round(age, 1), 'h')} ({when})"
+            return watched, False, _("Letzte Messung vor {a} ({w}) – Reagenz/Referenz leer oder Director gestört?",
+                                     a=fmt(round(age, 1), "h"), w=when)
+        return watched, True, _("vor {a} ({w})", a=fmt(round(age, 1), "h"), w=when)
     if kind == "doser":
         watched, v = st["enabled"] and bool(item.get("capacity")), values.get(key)
         if v is None:
-            return watched, None, "kein Wert"
-        if not watched:
-            return watched, True, f"{v:.0f} ml"
+            return watched, None, nv
         pct, days = values.get(f"{key}_pct"), values.get(f"{key}_tage")
-        rest = f"noch {v:.0f} ml" + (f" ({pct:.0f} %)" if pct is not None else "")
-        reach = f", reicht ca. {fmt(days)} Tage" if days is not None else ""
+        rest = _("noch {v} ml", v=f"{v:.0f}") + (f" ({pct:.0f} %)" if pct is not None else "")
+        reach = _(", reicht ca. {d} Tage", d=fmt(days)) if days is not None else ""
+        if not watched:
+            return watched, True, f"{v:.0f} ml{reach}"
         if v < st["min"]:
-            return watched, False, f"Behälter fast leer: {rest}{reach} (Meldung unter {st['min']:.0f} ml)"
+            return watched, False, _("Behälter fast leer: {rest}{reach} (Meldung unter {m} ml)",
+                                     rest=rest, reach=reach, m=f"{st['min']:.0f}")
         if st.get("tage") and days is not None and days < st["tage"]:
             per = values.get(f"{key}_verbrauch")
-            return watched, False, (f"Vorrat reicht nur noch ca. {fmt(days)} Tage: {rest}"
-                                    + (f", Verbrauch ca. {fmt(per)} ml/Tag" if per else ""))
+            return watched, False, (_("Vorrat reicht nur noch ca. {d} Tage: {rest}", d=fmt(days), rest=rest)
+                                    + (_(", Verbrauch ca. {v} ml/Tag", v=fmt(per)) if per else ""))
         return watched, True, f"{v:.0f} ml{reach}"
     watched, v = st["enabled"], values.get(key)
     status = values.get(f"{key}_status") or 0
     if status & 1536:  # Sensorfehler / Kommunikationsfehler laut ProfiLux (ab Firmware 7.52)
-        return watched, False, "ProfiLux meldet Sensorfehler – Sonde/Kabel prüfen"
+        return watched, False, _("ProfiLux meldet Sensorfehler – Sonde/Kabel prüfen")
     if v is None:
-        return watched, None, "kein Wert"
-    note = " (ProfiLux meldet Alarm)" if status & 256 else ""
+        return watched, None, nv
+    note = " " + _("(ProfiLux meldet Alarm)") if status & 256 else ""
     if not watched:
         return watched, True, fmt(v, unit) + note
     if st["min"] >= st["max"]:
-        return watched, True, f"{fmt(v, unit)} (Grenzen ungültig: Min ≥ Max)"
+        return watched, True, _("{v} (Grenzen ungültig: Min ≥ Max)", v=fmt(v, unit))
     if v < st["min"]:
-        return watched, False, f"{fmt(v, unit)} – unter Minimum {fmt(st['min'], unit)}"
+        return watched, False, _("{v} – unter Minimum {m}", v=fmt(v, unit), m=fmt(st["min"], unit))
     if v > st["max"]:
-        return watched, False, f"{fmt(v, unit)} – über Maximum {fmt(st['max'], unit)}"
+        return watched, False, _("{v} – über Maximum {m}", v=fmt(v, unit), m=fmt(st["max"], unit))
     return watched, True, fmt(v, unit)

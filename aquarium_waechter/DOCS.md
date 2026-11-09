@@ -14,6 +14,11 @@ Beispiele für eigene Automationen.
 3. Alarm aufs Handy: Einstellungsseite → **Alarm aufs Handy** → Handy einschalten,
    dann **„Test-Alarm senden“**.
 
+## 🌍 English · Français · Español · Italiano
+
+The dashboard, entities and alarms follow the language of Home Assistant automatically
+(option `sprache` to fix it). Full guide (German/English): **https://github.com/ghefs/aquarium-waechter**
+
 ## 🍖 Unterstützen
 
 Dieses Add-on ist kostenlos – und soll es bleiben. Wenn es dir eine schlaflose Nacht oder
