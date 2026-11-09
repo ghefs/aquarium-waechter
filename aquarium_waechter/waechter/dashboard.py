@@ -122,10 +122,18 @@ def build(workers):
                           "hours_to_show": hours,
                           "entities": [{"entity": e("sensor", it["key"]), "name": it["name"]} for it in its]})
         for title, its in _strips([it for it in items if it["kind"] == "switch"]):
-            cards.append({"type": "entities", "title": title, "state_color": True, "entities": [
-                {"entity": e("sensor", f"{it['key']}_current") if it["current"]
-                 else e("binary_sensor", f"{it['key']}_state"), "name": it["label"]}
-                for it in its]})
+            if any(it["current"] for it in its):
+                # Leiste mit Strommessung: je Dose Zustand (an/aus) und Strom nebeneinander
+                tiles = []
+                for it in its:
+                    tiles.append({"type": "tile", "entity": e("binary_sensor", f"{it['key']}_state"),
+                                  "name": it["label"]})
+                    tiles.append({"type": "tile", "name": "Strom", "entity": e("sensor", f"{it['key']}_current")}
+                                 if it["current"] else {"type": "markdown", "content": "ohne Strommessung"})
+                cards.append({"type": "grid", "title": title, "columns": 2, "square": False, "cards": tiles})
+            else:
+                cards.append({"type": "entities", "title": title, "state_color": True, "entities": [
+                    {"entity": e("binary_sensor", f"{it['key']}_state"), "name": it["label"]} for it in its]})
         dosers = [it for it in items if it["kind"] == "doser"]
         if dosers:
             pct = [it for it in dosers if it.get("capacity")]

@@ -3,6 +3,11 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.3.7
+
+- Dashboard: Bei Steckdosenleisten mit Strommessung (z. B. Powerbar 6E-PAB) steht jetzt
+  je Dose auch der Zustand (an/aus) neben dem Strom.
+
 ## 4.3.6
 
 - Einstellungsseite: Hinweis bei „Bereiche“, dass das Neueinlesen nach dem Umschalten 1–3 Minuten dauern kann.
