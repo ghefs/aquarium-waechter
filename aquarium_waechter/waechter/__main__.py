@@ -26,6 +26,8 @@ from .notify import Notifier, ha_language
 from . import report
 from .settings import REMINDER, SettingsStore, evaluate, fmt
 
+PLUG_SEARCH_EVERY = 300  # neue Steckdosen in HA alle 5 min suchen
+
 log = logging.getLogger("waechter")
 
 
@@ -344,6 +346,8 @@ class App:
         log.info("Sprache: %s", i18n.LANG)
         self.forecast = Forecast(self.data_dir / "verbrauch.json")
         self.plugs = HaPlugs(self.store)
+        self._plug_search = threading.Lock()
+        self._plugs_checked = time.time()
         self.notifier = Notifier(opts.get("telegram_chat_id"), opts.get("telegram_token") or None,
                                  opts.get("app_push"), self.store)
         # Externer Broker (Optionen mqtt_*) hat Vorrang vor dem Mosquitto-Add-on
@@ -444,6 +448,16 @@ class App:
 
     # ---------------------------------------------------------------- HA-Steckdosen
     def refresh_plugs(self):
+        # neu eingelernte Steckdosen ohne Neustart finden; nie zwei Suchen gleichzeitig
+        if not self._plug_search.acquire(blocking=False):
+            return
+        try:
+            self._refresh_plugs()
+        finally:
+            self._plug_search.release()
+            self._plugs_checked = time.time()
+
+    def _refresh_plugs(self):
         if self.plugs.refresh():
             try:
                 self.bridge.announce_waechter()
@@ -559,6 +573,9 @@ class App:
             self.notifier.send(_("Add-on gestartet"), ", ".join(f"{w.name} ({w.host})" for w in self.workers))
         while True:
             self.mqtt.loop(5)
+            if time.time() - self._plugs_checked > PLUG_SEARCH_EVERY:
+                self._plugs_checked = time.time()
+                threading.Thread(target=self.refresh_plugs, daemon=True, name="steckdosen").start()
             if self.store.data.get("wartung_bis") and not self.maintenance():
                 self._end_maintenance()
                 self._publish_maintenance()

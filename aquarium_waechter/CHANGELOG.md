@@ -3,6 +3,12 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.5.1
+
+- Neu eingelernte Steckdosen in Home Assistant (z. B. ein neuer Shelly) erscheinen jetzt nach
+  höchstens 5 Minuten auf der Einstellungsseite – bisher erst nach einem Neustart des Add-ons
+  oder „Geräte neu einlesen“.
+
 ## 4.5.0
 
 - **Fünf Sprachen / five languages:** Deutsch, English, Français, Español, Italiano.
