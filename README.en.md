@@ -54,6 +54,20 @@ phone (HA companion app and/or Telegram):
 Telegram alarms are sent by the add-on **directly** to Telegram – so they arrive even
 if Home Assistant itself is stuck. If you want to be really safe, use both.
 
+### Screenshots
+
+*Shown in German – the add-on displays everything in the language of your Home Assistant
+(English, Deutsch, Français, Español, Italiano).*
+
+**Overview** – status, total power, values with history, power bars with on/off and current:
+
+![Dashboard overview](images/dashboard.png)
+
+<table><tr>
+<td width="50%"><b>Dosing containers</b> – fill level, “lasts … days”, consumption; next to it the monitoring rules in plain words:<br><img src="images/dosierer.png" alt="Dosing containers and monitoring"></td>
+<td width="50%"><b>Settings</b> – all by click, no YAML: power bars, areas, limits, alarm delay:<br><img src="images/einstellungen.png" alt="Settings page"></td>
+</tr></table>
+
 ### Why this project?
 
 Because a pump failed unnoticed over a weekend. The aquarium controller regulates
@@ -112,7 +126,7 @@ with updates, bug fixes and adjustments to new firmware.
 > The GHL API serves **only one client at a time** – other queries of the same
 > ProfiLux (old `tcp` sensors, Node-RED …) must be removed.
 
-### Key German terms in the UI
+### Key German terms (screenshots, German HA)
 
 | German | English |
 |---|---|

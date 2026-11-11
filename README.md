@@ -52,6 +52,17 @@ Home-Assistant-Add-on, das einen oder mehrere Aquariencomputer **GHL ProfiLux 4*
 Telegram-Alarme schickt das Add-on **direkt** an Telegram – sie kommen also auch dann,
 wenn Home Assistant selbst gerade hängt. Wer ganz sicher gehen will, nutzt beides.
 
+### So sieht es aus
+
+**Übersicht** – Status, Gesamtleistung, Messwerte mit Verlauf, Steckdosenleisten mit An/Aus und Strom:
+
+![Dashboard mit Übersicht](images/dashboard.png)
+
+<table><tr>
+<td width="50%"><b>Dosierbehälter</b> – Füllstand, „reicht noch … Tage“, Verbrauch; daneben „So wird überwacht“ in Klartext:<br><img src="images/dosierer.png" alt="Dosierbehälter und Überwachung"></td>
+<td width="50%"><b>Einstellungen</b> – alles per Klick, ohne YAML: Leisten, Bereiche, Grenzwerte, Alarm-Verzögerung:<br><img src="images/einstellungen.png" alt="Einstellungsseite"></td>
+</tr></table>
+
 ### Warum dieses Projekt?
 
 Weil am Wochenende unbemerkt eine Pumpe ausgefallen ist. Der Aquariencomputer regelt
