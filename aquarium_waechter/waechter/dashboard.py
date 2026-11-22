@@ -140,6 +140,21 @@ def _strips(switches):
     return out
 
 
+def _ctl_cards(dev, level):
+    """Karten für die Steuerung (Aktionen) bzw. dauerhaft schreibbare Einstellungen – nur mit Freigabe je Gerät."""
+    ents = [{"entity": f"{c['component']}.{dev.uid}_{c['id']}", "name": c["name"]}
+            for c in dev.steuerung.controls() if c["level"] == level and c["enabled"]]
+    if not ents:
+        return []
+    if level == "aktion":
+        return [{"type": "entities", "title": _("Steuerung"), "state_color": True, "entities": ents}]
+    return [{"type": "vertical-stack", "cards": [
+        {"type": "markdown", "title": _("Einstellungen im Gerät ändern"), "content": _(
+            "**Vorsicht:** Sollwerte und Lichtkurven werden **dauerhaft im Gerät** gespeichert, genau wie in GHL Connect. "
+            "Sollwerte lassen sich nur in kleinen Schritten ändern (Sicherheitsgrenze).")},
+        {"type": "entities", "state_color": True, "entities": ents}]}]
+
+
 def build(workers):
     views = []
     for dev in workers:
@@ -225,6 +240,7 @@ def build(workers):
         if lights:
             cards.append({"type": "history-graph", "title": _("Licht – Helligkeit"), "hours_to_show": 24,
                           "entities": [{"entity": e("sensor", it["key"]), "name": _n(it["label"])} for it in lights]})
+        cards += _ctl_cards(dev, "aktion")
         cards.append({"type": "markdown", "title": _("So wird überwacht"), "content": _md_watched(uid)})
         views.append({"title": dev.name, "path": uid, "icon": "mdi:fishbowl", "cards": cards})
 
@@ -284,6 +300,7 @@ def build(workers):
             cards.append({"type": "vertical-stack", "cards": [
                 {"type": "entities", "title": title, "entities": rows, "state_color": True},
                 {"type": "markdown", "content": _md_rules(uid, settable)}]})
+        cards += _ctl_cards(dev, "einstellung")
         ha_plugs = workers[0].app.plugs.plugs if workers else []
         comp = "select" if len(workers) > 1 else "switch"
         cards.append({"type": "vertical-stack", "cards": [

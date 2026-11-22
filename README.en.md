@@ -42,6 +42,9 @@ phone (HA companion app and/or Telegram):
   of the dosing containers, faults of the week.
 - **Maintenance mode:** one switch pauses all alarms while you work on the tank;
   it switches itself off after the set time.
+- **Optional: control ProfiLux and Mitras from HA** – maintenance, feeding pause, water change, light scenes, thunderstorm,
+  master brightness, KH/ION Director actions and (second opt-in) setpoints, light curves and names
+  (off by default, see [below](#optional-control-profilux-and-mitras-from-home-assistant))
 - **Everything configurable in HA:** what is read, what is monitored, limits.
 - **Dashboard is created automatically** – an overview and a settings page per ProfiLux.
 - **Five languages:** English, Deutsch, Français, Español, Italiano – dashboard, entities and
@@ -103,7 +106,7 @@ with updates, bug fixes and adjustments to new firmware.
 > (*Settings → System → Backups*).
 
 1. **Enable the GHL API** – in GHL Connect under *System → GHL API* (“read only” is
-   enough). It is switched off again after every firmware update. Give the ProfiLux a
+   enough; only the [optional control](#optional-control-profilux-and-mitras-from-home-assistant) needs “full access”). It is switched off again after every firmware update. Give the ProfiLux a
    fixed IP address.
 2. **MQTT:** *Settings → Add-ons → Add-on Store* → install and start **Mosquitto
    broker**, then under *Devices & services* “MQTT discovered” → **Configure**.
@@ -140,10 +143,43 @@ with updates, bug fixes and adjustments to new firmware.
 | Geräte neu einlesen | rescan devices |
 | Nachfüllen | refill |
 
+## Optional: control ProfiLux and Mitras from Home Assistant
+
+By default the add-on only **reads**. If you want, you can enable two opt-ins per device – everything uses the documented write
+commands of the **official GHL API**:
+
+| Opt-in (per device in the add-on configuration) | What appears in HA |
+|---|---|
+| `steuerung: true` – **actions** | maintenance mode 1–4, feeding pause 1–4, water change 1–4 (pause the alarms), light scenes 1–8 (with fade time), thunderstorm (duration, start/stop), **master brightness**, actions of the **KH Director** (measure, vent tube, flush/empty cell, stop) and **ION Director** |
+| `einstellungen_schreiben: true` – **permanent changes in the device** | **setpoints** (sensors, KH, ION), **light curves** (text `06:30=0, 08:00=40, …`), **names** (at most 16 characters; disabled in HA at first) |
+
+1. In GHL Connect under *System → GHL API* choose **“Full access”**. With “Read only” the ProfiLux rejects every write command
+   with `NACK (-105)`; the add-on then tells you so in a notification.
+2. Set the wanted opt-in to `true` for the device in the add-on configuration (default: off).
+3. The dashboard gets a **“Control”** and **“Change settings in the device”** card – only when the opt-in is set.
+
+**Safety of permanent changes:** setpoints are only accepted in a plausible range per sensor type (e.g. temperature 10–35 °C,
+pH 6–9.5) and only in small steps (at most ±3 K, ±0.5 pH, ±20 % … per change). Light curves are validated (times ascending, at most
+24 points, 0–100 %), read back after writing and restored if something fails. Names: letters without umlauts, digits and simple
+punctuation only.
+
+**Maintenance, feeding pause, water change** pause the alarms for the configured duration (“Maintenance – duration”,
+`futterpause_min` default 15, `wasserwechsel_min` default 60 minutes) – match it to the duration set in GHL Connect.
+The ProfiLux does **not report back** the state of these functions: the switches show an assumed state and fall back by themselves
+after the duration; nothing is sent to the ProfiLux at that moment.
+
+**Mitras luminaires** (LX7/LX8) are detected (option `typ`: `auto`, `profilux`, `mitras`): light channels, heatsink temperature, light scenes,
+thunderstorm, maintenance, master brightness and light curves. The add-on also shows the **deviation of the device clock**.
+
+> **Security:** “Full access” has no login – any device on your network that can reach the ProfiLux can then trigger functions.
+> The GHL documentation recommends “Read only” whenever you do not need to write. Run the ProfiLux only on a network you
+> control and never forward port 10002 to the internet.
+
 ## To the GHL team 👋
 
 Thank you for the open GHL API – without it this project would not exist. The add-on
-uses **only the official API**, read-only. Some information shown in GHL Connect is
+uses **only the official API** and by default only reads (triggering maintenance and feeding pause is an explicitly
+enabled option). Some information shown in GHL Connect is
 not (yet) available via the API. It would be great to have:
 
 1. **Power bars:** which bar (PAB, STDL …) a socket belongs to
@@ -155,7 +191,7 @@ not (yet) available via the API. It would be great to have:
 7. **Timers and pumps:** switching times and current flow programs
 8. **Mains monitoring (LinMon):** power-failure state, so HA can report it
 9. **Multiple clients at once** – e.g. Home Assistant plus another tool
-10. *Later:* optional **write access with authentication**, e.g. start maintenance from Home Assistant
+10. *Later:* **write access with authentication** (today there is only “Full access” without a password), so functions like maintenance can be triggered more safely
 
 I'm happy to test new firmware with such extensions on real tanks – contact via the
 [issues](https://github.com/ghefs/aquarium-waechter/issues).

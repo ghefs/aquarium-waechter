@@ -3,6 +3,27 @@
 Vor jedem Update empfiehlt sich ein Backup von Home Assistant
 (beim Aktualisieren den Haken „Backup erstellen“ gesetzt lassen).
 
+## 4.7.0
+
+- **Optional: ProfiLux und Mitras aus Home Assistant steuern** – vollständig über die offizielle GHL-API
+  (SET-Befehle). Zwei getrennte Freigaben je Gerät, beide standardmäßig aus; die API muss dafür in GHL Connect unter
+  *System → GHL API* auf „Voller Zugriff“ stehen (bei „Nur lesen“ meldet das Add-on `NACK (-105)` verständlich):
+  - `steuerung: true` – **Aktionen:** Wartungsmodus 1–4, Futterpause 1–4, Wasserwechsel 1–4 (pausieren dabei die Alarme),
+    Lichtszenen 1–8 (mit Überblendzeit), Gewitter (Dauer, Start/Stopp), **Master-Helligkeit** (mit Überblendzeit),
+    Aktionen des **KH-Directors** (Messung, Schlauch entlüften, Messzelle spülen/leeren, Stopp) und des **ION-Directors**.
+  - `einstellungen_schreiben: true` – **dauerhafte Änderungen im Gerät**, mit Sicherheitsgrenzen: Sollwerte von Sensoren,
+    KH- und ION-Director (Wertebereich je Sensorart und Höchstsprung je Änderung), **Lichtkurven** (Text „06:30=0, 08:00=40 …“,
+    wird nach dem Schreiben zurückgelesen und bei Fehlern wiederhergestellt) und **Namen** (≤ 16 Zeichen, Namen standardmäßig in HA deaktiviert).
+  - **Mitras-Leuchten** (LX7/LX8) werden erkannt (Option `typ`): Lichtkanäle, Kühlkörper-Temperatur, Szenen, Gewitter,
+    Wartung, Master-Helligkeit, Lichtkurven.
+  - Das Dashboard zeigt eine Karte „Steuerung“ (und „Einstellungen im Gerät ändern“) nur, wenn die Freigabe gesetzt ist.
+  - Neue Optionen `futterpause_min` (Standard 15) und `wasserwechsel_min` (Standard 60) für die Dauer der Alarmpause.
+  - Der ProfiLux meldet den Zustand der Sonderfunktionen nicht zurück – Schalter zeigen einen angenommenen Zustand und
+    springen nach der Dauer von selbst zurück (am Gerät wird dabei nichts gesendet).
+- **Neu beim Lesen:** Abweichung der Geräteuhr (`sensor.<gerät>_uhr_abweichung`, s) – geht sie falsch, sind alle
+  gespeicherten Zeitstempel verschoben.
+- Lesen und Schreiben am selben Gerät laufen nie gleichzeitig (der Port bedient nur einen Client).
+
 ## 4.5.1
 
 - Neu eingelernte Steckdosen in Home Assistant (z. B. ein neuer Shelly) erscheinen jetzt nach

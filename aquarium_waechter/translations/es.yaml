@@ -1,7 +1,7 @@
 configuration:
   geraete:
     name: "Dispositivos ProfiLux"
-    description: "Por ProfiLux: name y host (IP). Todo lo demás es más cómodo en HA, en la página de ajustes del panel. Valor por defecto opcional: steckdosenleisten (enchufes por regleta, p. ej. \"STDL=4 (ohne Strom), PAB=6\" – más fácil: elegir las regletas en HA). Las áreas (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht) se activan más fácilmente en HA. unbenannte_abfragen: leer también elementos sin nombre."
+    description: "Por ProfiLux: name y host (IP). Todo lo demás es más cómodo en HA, en la página de ajustes del panel. Valor por defecto opcional: steckdosenleisten (enchufes por regleta, p. ej. \"STDL=4 (ohne Strom), PAB=6\" – más fácil: elegir las regletas en HA). Las áreas (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht) se activan más fácilmente en HA. unbenannte_abfragen: leer también elementos sin nombre. steuerung: true activa acciones (modo mantenimiento, pausa de alimentación, cambio de agua, escenas de luz, tormenta, brillo principal, acciones de KH/ION Director). einstellungen_schreiben: true activa además cambios permanentes (valores objetivo, curvas de luz, nombres – con límites de seguridad). Ambos están desactivados por defecto y requieren Sistema → API GHL → «Acceso completo» en GHL Connect. typ: auto (por defecto), profilux o mitras (luminaria LX7/LX8)."
   telegram_chat_id:
     name: "ID de chat de Telegram"
     description: "Destino de las alarmas – grupo (empieza por -) o chat privado (número positivo), varios separados por comas. Cómo encontrar el ID: ver la wiki, \"Telegram\". Vacío = sin Telegram."
@@ -11,6 +11,12 @@ configuration:
   telegram_token:
     name: "Token del bot de Telegram"
     description: "Déjalo vacío si la integración de Telegram está configurada en HA – entonces se usa su token."
+  futterpause_min:
+    name: "Pausa de alimentación: pausar alarmas (minutos)"
+    description: "Solo con «steuerung»: cuánto tiempo se pausan las alarmas al iniciar una pausa de alimentación del ProfiLux desde Home Assistant. Ajústalo a la duración de GHL Connect. Por defecto 15."
+  wasserwechsel_min:
+    name: "Cambio de agua: pausar alarmas (minutos)"
+    description: "Solo con «steuerung»: cuánto tiempo se pausan las alarmas al iniciar un cambio de agua desde Home Assistant. Ajústalo a la duración de GHL Connect. Por defecto 60."
   intervall:
     name: "Intervalo de consulta (segundos)"
   erinnerung:

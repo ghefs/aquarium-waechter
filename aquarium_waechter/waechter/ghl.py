@@ -10,6 +10,7 @@ Indizes beginnen bei 0, GHL Connect zählt ab 1.
 import logging
 import re
 import socket
+import threading
 import time
 
 from .i18n import _
@@ -33,12 +34,13 @@ NACK_TEXT = {
     -101: "Index/Hardware nicht vorhanden",
     -102: "Feature nicht unterstützt",
     -104: "Ende der Messhistorie",
-    -105: "kein Zugriff – GHL-API aus (nach Firmware-Update wieder aktivieren!)",
+    -105: "kein Zugriff – GHL-API aus, oder bei Schreibbefehlen auf „Nur lesen“ (nach Firmware-Update wieder aktivieren!)",
 }
 
 
 class GhlClient:
     def __init__(self, host, port=10002, timeout=10):
+        self._lock = threading.RLock()   # der Port bedient nur einen Client: Lesen und Schreiben nie gleichzeitig
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -51,7 +53,7 @@ class GhlClient:
 
     def _once(self, command, timeout=None):
         timeout = timeout or self.timeout
-        with socket.create_connection((self.host, self.port), timeout) as s:
+        with self._lock, socket.create_connection((self.host, self.port), timeout) as s:
             s.settimeout(timeout)
             s.sendall((command + "\n").encode())
             data = b""
@@ -100,6 +102,27 @@ class GhlClient:
             last_error = ReadError(f"{command} -> unerwartete Antwort: {reply or 'keine'}")
         if conn_error is not None and not optional:
             self.down = str(conn_error)
+        raise last_error
+
+    def set(self, command, retries=2):
+        """Schreibbefehl (SET …): True bei ACK. NackError bei NACK – -105 heißt: API aus oder nur lesend."""
+        last_error = None
+        for attempt in range(retries + 1):
+            try:
+                reply = self._once(command)
+            except OSError as e:
+                last_error = ReadError(f"{command} -> {e}")
+                time.sleep(1 + attempt)
+                continue
+            finally:
+                time.sleep(0.2)
+            if reply.startswith("ACK"):
+                return True
+            m = re.match(r"NACK\s*\((-?\d+)\)", reply)
+            if m:
+                code = int(m.group(1))
+                raise NackError(f"{command} -> NACK ({code}) {NACK_TEXT.get(code, '')}".strip(), code)
+            last_error = ReadError(f"{command} -> unerwartete Antwort: {reply or 'keine'}")
         raise last_error
 
     def try_get(self, command):
@@ -241,7 +264,7 @@ def socket_pos(i, strips):
 
 
 # Indexbereiche laut GHL-API-Referenz (Dokumentversion 1.1)
-MAX = {"switch": 64, "sensor": 32, "level": 16, "flow": 4, "doser": 32, "light": 32, "ion": 5}
+MAX = {"switch": 64, "sensor": 32, "level": 16, "flow": 4, "doser": 32, "light": 32, "ion": 5, "timer": 32}
 
 # Statusbits im Messprotokoll (DATARECORD, 5. Feld)
 SENSOR_ALARM, SENSOR_ERROR, SENSOR_COMM = 256, 512, 1024
@@ -296,6 +319,9 @@ class Inventory:
         self.kh = False
         self.status_bits = False
         self.scanned = False
+        self.model = "ProfiLux"      # oder "Mitras" (Leuchte: nur Licht, Kühlkörper-Temperatur, Szenen)
+        self.heatsink = False
+        self.timers = []
 
     def set_strips(self, text):
         self.strips = parse_strips(text)
@@ -310,6 +336,11 @@ class Inventory:
 
         def desc(cmd):
             return (g.try_get(cmd) or "").strip()
+
+        self.model = self._detect_model()
+        if self.model == "Mitras":
+            self._scan_mitras()
+            return
 
         self.channels = []
         if self.on("steckdosen"):
@@ -394,15 +425,52 @@ class Inventory:
                     continue
                 self.lights.append({"i": i, "name": name or _("Licht {n}", n=i + 1), "named": bool(name)})
             trim(self.lights, "light", self.keep)
+        self.timers = []
+        if self.cfg.get("einstellungen_schreiben"):      # Timer-Namen nur für das Umbenennen
+            for i in range(MAX["timer"]):
+                name = g.try_get(f"GET TIMER[{i}] DESCRIPTION")
+                if name is None:
+                    break
+                self.timers.append({"i": i, "name": name.strip()})
         self.scanned = True
         log.info("Inventar: %d Steckdosen, %d Sensoren, %d Niveau, %d Durchfluss, %d Dosierer, "
                  "%d Lichtkanäle, KH-Director: %s, ION-Director: %s", len(self.channels), len(self.sensors),
                  len(self.levels), len(self.flows), len(self.dosers), len(self.lights),
                  "ja" if self.kh else "nein", "ja" if self.ions else "nein")
 
+    def _detect_model(self):
+        """ProfiLux oder Mitras-Leuchte? Option `typ` je Gerät (auto/profilux/mitras); auto: eine Mitras hat
+        keine Schaltkanäle und keinen Sensor mit Index, aber Lichtkanäle."""
+        want = str(self.cfg.get("typ") or "auto").lower()
+        if want == "mitras":
+            return "Mitras"
+        if want == "profilux":
+            return "ProfiLux"
+        g = self.ghl
+        if g.try_get("GET SWITCHCHANNEL[0] ACTSTATE") is not None or g.try_get("GET SENSOR[0] ACTVALUE") is not None:
+            return "ProfiLux"
+        return "Mitras" if g.try_get("GET ILLUMINATION[0] ACTBRIGHTNESS") is not None else "ProfiLux"
+
+    def _scan_mitras(self):
+        """Mitras LX7/LX8: nur Lichtkanäle (ohne Namen), Kühlkörper-Temperatur, Sonderfunktionen."""
+        g = self.ghl
+        self.channels, self.sensors, self.levels, self.flows = [], [], [], []
+        self.dosers, self.ions, self.timers, self.kh = [], [], [], False
+        self.heatsink = g.try_get("GET SENSOR ACTVALUE") is not None
+        self.lights = []
+        if self.on("licht"):
+            for i in range(MAX["light"]):
+                if g.try_get(f"GET ILLUMINATION[{i}] ACTBRIGHTNESS") is None:
+                    break
+                self.lights.append({"i": i, "name": _("Licht {n}", n=i + 1), "named": False})
+        self.scanned = True
+        log.info("Inventar (Mitras): %d Lichtkanäle, Kühlkörper-Temperatur: %s", len(self.lights),
+                 "ja" if self.heatsink else "nein")
+
     def signature(self):
         """Ändert sich, wenn Teile/Namen dazukommen/wegfallen (-> Discovery/Dashboard neu)."""
-        return repr((self.channels, [(s["i"], s["name"]) for s in self.sensors],
+        return repr((self.model, self.heatsink, [(t["i"], t["name"]) for t in self.timers],
+                     self.channels, [(s["i"], s["name"]) for s in self.sensors],
                      self.levels, self.flows, self.dosers, self.lights, self.ions, self.kh,
                      self.strips))
 
@@ -416,6 +484,10 @@ class Inventory:
                 return prefix
             return f"{prefix} · {it['name']}"
 
+        if self.heatsink:
+            out.append({"key": "heatsink", "kind": "value", "name": _("Kühlkörper-Temperatur"),
+                        "label": _("Kühlkörper-Temperatur"), "named": True, "unit": "°C",
+                        "device_class": "temperature", "cmd": "GET SENSOR ACTVALUE"})
         for c in self.channels:
             strip, pos, measures = socket_pos(c["i"], self.strips)
             out.append({"key": f"switch_{c['i']}", "kind": "switch", "name": c["name"],

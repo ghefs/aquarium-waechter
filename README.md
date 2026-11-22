@@ -42,6 +42,9 @@ Home-Assistant-Add-on, das einen oder mehrere Aquariencomputer **GHL ProfiLux 4*
 - **Wochenbericht** aufs Handy: Mittel/Min/Max der Messwerte, Verbrauch und Vorrat der
   Dosierbehälter, Störungen der Woche
 - **Wartungsmodus:** Ein Schalter pausiert die Alarme, solange man am Becken arbeitet
+- **Optional: ProfiLux und Mitras aus HA steuern** – Wartung, Futterpause, Wasserwechsel, Lichtszenen, Gewitter,
+  Master-Helligkeit, KH-/ION-Director-Aktionen und (zweite Freigabe) Sollwerte, Lichtkurven und Namen
+  (Standard aus, siehe [unten](#optional-profilux-und-mitras-aus-home-assistant-steuern))
 - **Alles in HA einstellbar:** was abgefragt wird, was überwacht wird, Grenzwerte
 - **Dashboard wird automatisch erzeugt** – eine Übersicht und eine Einstellungsseite je ProfiLux
 - **Fünf Sprachen:** Deutsch, English, Français, Español, Italiano – Dashboard, Entitäten und
@@ -102,7 +105,8 @@ Fehlerkorrekturen und Anpassungen an neue Firmware.
 > Voraussetzung: Home Assistant **OS** (oder „Supervised“) und ein **Backup** vorher
 > (*Einstellungen → System → Backups*).
 
-1. **GHL-API einschalten** – in GHL Connect unter *System → GHL API* („Nur lesen“ genügt).
+1. **GHL-API einschalten** – in GHL Connect unter *System → GHL API* („Nur lesen“ genügt; nur die
+   [optionale Steuerung](#optional-profilux-und-mitras-aus-home-assistant-steuern) braucht „Voller Zugriff“).
    Nach jedem Firmware-Update ist sie wieder aus. Der ProfiLux braucht eine feste IP-Adresse.
 2. **MQTT:** *Einstellungen → Add-ons → Add-on-Store* → **Mosquitto broker** installieren
    und starten, dann unter *Geräte & Dienste* „MQTT gefunden“ → **Konfigurieren**.
@@ -165,10 +169,44 @@ GHL-API-Kurzreferenz: Klartext über TCP 10002, `GET SWITCHCHANNEL[n] ACTSTATE`,
 `GET KHDIRECTOR ACTVALUE`, `GET KHDIRECTOR DATARECORD[0]` (Zeit der letzten Messung).
 Antworten `ACK <…>` / `NACK (code)`; Indizes ab 0.
 
+## Optional: ProfiLux und Mitras aus Home Assistant steuern
+
+Standardmäßig **liest** das Add-on nur. Wer will, kann je Gerät zwei Freigaben einschalten – alles über die
+dokumentierten Schreibbefehle der **offiziellen GHL-API**:
+
+| Freigabe (je Gerät in der Add-on-Konfiguration) | Was dann in HA erscheint |
+|---|---|
+| `steuerung: true` – **Aktionen** | Wartungsmodus 1–4, Futterpause 1–4, Wasserwechsel 1–4 (pausieren die Alarme), Lichtszenen 1–8 (mit Überblendzeit), Gewitter (Dauer, Start/Stopp), **Master-Helligkeit**, Aktionen von **KH-Director** (Messung, Schlauch entlüften, Messzelle spülen/leeren, Stopp) und **ION-Director** |
+| `einstellungen_schreiben: true` – **dauerhafte Änderungen im Gerät** | **Sollwerte** (Sensoren, KH, ION), **Lichtkurven** (Text `06:30=0, 08:00=40, …`), **Namen** (höchstens 16 Zeichen; in HA zunächst deaktiviert) |
+
+1. In GHL Connect unter *System → GHL API* auf **„Voller Zugriff“** stellen. Bei „Nur lesen“ lehnt der ProfiLux
+   jeden Schreibbefehl mit `NACK (-105)` ab; das Add-on weist dann in einer Meldung darauf hin.
+2. Die gewünschte Freigabe beim Gerät in der Add-on-Konfiguration auf `true` setzen (Standard: aus).
+3. Das Dashboard bekommt eine Karte **„Steuerung“** bzw. **„Einstellungen im Gerät ändern“** – nur dann, wenn die Freigabe gesetzt ist.
+
+**Sicherheit der dauerhaften Änderungen:** Sollwerte werden nur im plausiblen Bereich je Sensorart angenommen
+(z. B. Temperatur 10–35 °C, pH 6–9,5) und nur in kleinen Schritten geändert (höchstens ±3 K, ±0,5 pH, ±20 % …
+je Änderung). Lichtkurven werden geprüft (Zeiten aufsteigend, höchstens 24 Punkte, 0–100 %), nach dem Schreiben
+zurückgelesen und bei einem Fehler auf den alten Stand zurückgesetzt. Namen: nur Buchstaben ohne Umlaute, Ziffern
+und einfache Satzzeichen.
+
+**Wartung, Futterpause, Wasserwechsel** pausieren die Alarme für die eingestellte Dauer („Wartung – Dauer“,
+`futterpause_min` Standard 15, `wasserwechsel_min` Standard 60 Minuten) – stelle sie passend zur Dauer in GHL Connect ein.
+Der ProfiLux meldet den Zustand dieser Funktionen **nicht zurück**: Die Schalter zeigen einen angenommenen Zustand und
+springen nach der Dauer von selbst zurück; am ProfiLux wird dabei nichts gesendet.
+
+**Mitras-Leuchten** (LX7/LX8) werden erkannt (Option `typ`: `auto`, `profilux`, `mitras`): Lichtkanäle, Kühlkörper-Temperatur,
+Lichtszenen, Gewitter, Wartung, Master-Helligkeit und Lichtkurven. Zusätzlich zeigt das Add-on die **Abweichung der Geräteuhr** an.
+
+> **Sicherheit:** „Voller Zugriff“ hat keine Anmeldung – jedes Gerät im Netz, das den ProfiLux erreicht, kann dann
+> Funktionen auslösen. Die GHL-Dokumentation empfiehlt „Nur lesen“, wenn man nichts schreiben muss.
+> ProfiLux nur in einem Netz betreiben, das du kontrollierst, und Port 10002 nie ins Internet weiterleiten.
+
 ## An das GHL-Team 👋
 
 Danke für die offene GHL-API – ohne sie gäbe es dieses Projekt nicht. Das Add-on nutzt
-**ausschließlich die offizielle API** und greift nur lesend zu. Einige Informationen,
+**ausschließlich die offizielle API** und liest standardmäßig nur (Wartung und Futterpause
+auslösen ist eine ausdrücklich zuschaltbare Option). Einige Informationen,
 die GHL Connect anzeigt, sind über die API (noch) nicht abrufbar. Schön wäre:
 
 1. **Steckdosenleisten:** zu welcher Leiste (PAB, STDL …) eine Steckdose gehört
@@ -180,7 +218,7 @@ die GHL Connect anzeigt, sind über die API (noch) nicht abrufbar. Schön wäre:
 7. **Timer und Pumpen:** Schaltzeiten und aktuelle Strömungsprogramme
 8. **Netzüberwachung (LinMon):** Stromausfall-Status, damit HA ihn melden kann
 9. **Mehrere Clients gleichzeitig** – z. B. Home Assistant und ein weiteres Tool
-10. *Später:* optionaler **Schreibzugriff mit Anmeldung**, z. B. Wartung aus Home Assistant starten
+10. *Später:* **Schreibzugriff mit Anmeldung** (heute gibt es nur „Voller Zugriff“ ohne Passwort), damit sich Funktionen wie Wartung sicherer auslösen lassen
 
 Neue Firmware mit solchen Erweiterungen teste ich gern an echten Becken – Kontakt
 über die [Issues](https://github.com/ghefs/aquarium-waechter/issues).

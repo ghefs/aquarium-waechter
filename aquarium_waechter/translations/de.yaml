@@ -8,6 +8,7 @@ configuration:
       Bereiche (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht)
       lassen sich bequemer in HA auf der Einstellungsseite an-/ausschalten.
       unbenannte_abfragen: auch Teile ohne Namen auslesen.
+      steuerung: true schaltet Aktionen frei (Wartungsmodus, Futterpause, Wasserwechsel, Lichtszenen, Gewitter, Master-Helligkeit, Aktionen von KH-/ION-Director). einstellungen_schreiben: true schaltet zusätzlich dauerhafte Änderungen frei (Sollwerte, Lichtkurven, Namen – mit Sicherheitsgrenzen). Beides ist standardmäßig aus und braucht in GHL Connect unter System → GHL API „Voller Zugriff“. typ: auto (Standard), profilux oder mitras (Leuchte LX7/LX8).
   telegram_chat_id:
     name: Telegram-Chat-ID
     description: Wohin die Alarme gehen – Gruppe (beginnt mit -) oder Einzelchat (positive Zahl), mehrere mit Komma. Wie man die ID findet, steht in der Anleitung unter „Telegram“. Leer = kein Telegram.
@@ -21,6 +22,12 @@ configuration:
   telegram_token:
     name: Telegram-Bot-Token
     description: Leer lassen, wenn die Telegram-Integration in HA eingerichtet ist – dann wird deren Token benutzt.
+  futterpause_min:
+    name: "Futterpause: Alarme pausieren (Minuten)"
+    description: "Nur mit „steuerung“: So lange pausieren die Alarme, wenn du am ProfiLux eine Futterpause aus Home Assistant startest. Passend zur Dauer in GHL Connect wählen. Standard 15."
+  wasserwechsel_min:
+    name: "Wasserwechsel: Alarme pausieren (Minuten)"
+    description: "Nur mit „steuerung“: So lange pausieren die Alarme, wenn du einen Wasserwechsel am Gerät aus Home Assistant startest. Passend zur Dauer in GHL Connect wählen. Standard 60."
   intervall:
     name: Abfrageintervall (Sekunden)
   erinnerung:

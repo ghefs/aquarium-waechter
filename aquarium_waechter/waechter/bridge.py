@@ -11,6 +11,8 @@ aus HA entfernt (leere Discovery-Nachricht).
 
 import datetime
 import logging
+import threading
+import time
 
 from .notify import phone_name
 from .ghl import CATEGORIES, CATEGORY_NAMES, MAX_STRIPS, NO_STRIP, SENSOR_ARTS, STRIP_TYPES
@@ -36,6 +38,7 @@ class Bridge:
         mqtt.subscribe(f"{prefix}/+/cfg/+/+/set")
         mqtt.subscribe(f"{prefix}/+/bereich/+/set")
         mqtt.subscribe(f"{prefix}/+/leiste/+/set")
+        mqtt.subscribe(f"{prefix}/+/ctl/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/+")
         mqtt.subscribe(f"{prefix}/_waechter/push/+/set")
         mqtt.subscribe(f"{prefix}/_waechter/plug/+/set")
@@ -92,6 +95,12 @@ class Bridge:
                 self._pub(f"{self.prefix}/{dev.uid}/bereich/{parts[3]}", "ON" if value else "OFF", retain=True)
                 dev.bereich_changed()
             return
+        if len(parts) == 5 and parts[2] == "ctl" and parts[4] == "set":
+            dev = self.devices.get(parts[1])
+            if dev:
+                # Netzwerkzugriff auf das Gerät nicht im MQTT-Thread
+                threading.Thread(target=self._ctl, args=(dev, parts[3], payload), daemon=True, name="steuerung").start()
+            return
         if len(parts) != 6 or parts[2] != "cfg" or parts[5] != "set":
             return
         dev = self.devices.get(parts[1])
@@ -107,6 +116,24 @@ class Bridge:
         self.publish_field(dev, key, field, value)
         if field in ("aktiv", "art"):
             dev.items_changed()  # Entitäten neu melden, Dashboard neu
+
+    def _ctl(self, dev, cid, payload):
+        dev.steuerung.handle(cid, payload)
+        self.publish_ctl(dev)
+
+    def publish_ctl(self, dev):
+        """Zustand der Steuer-Entitäten (Schalter: angenommen – das Gerät meldet ihn nicht zurück)."""
+        for c in dev.steuerung.controls():
+            if c["component"] == "button":
+                continue
+            v = dev.steuerung.state.get(c["id"])
+            if v is None:
+                v = dev.steuerung.initial_state(c["id"], c["component"])
+            if v is None:
+                continue
+            if c["component"] == "select":
+                v = _(v)
+            self._pub(f"{self.prefix}/{dev.uid}/ctl/{c['id']}", v, retain=True)
 
     # ------------------------------------------------------------ Helfer
     def _pub(self, topic, payload, retain=False):
@@ -135,6 +162,7 @@ class Bridge:
         for cat in CATEGORIES:
             self._pub(f"{self.prefix}/{dev.uid}/bereich/{cat}", "ON" if dev.bereich(cat) else "OFF", retain=True)
         self.publish_strips(dev)
+        self.publish_ctl(dev)
 
     def publish_strips(self, dev):
         chosen = dev.leisten()
@@ -297,7 +325,7 @@ class Bridge:
     def announce(self, dev):
         uid, base, inv = dev.uid, f"{self.prefix}/{dev.uid}", dev.inv
         device = {"identifiers": [f"ghl_{uid}"], "name": dev.name, "manufacturer": "GHL",
-                  "model": "ProfiLux", "sw_version": inv.meta.get("firmware"),
+                  "model": inv.model, "sw_version": inv.meta.get("firmware"),
                   "configuration_url": f"http://{dev.host}"}
         st = f"{base}/state"
         avail_live = {"availability": [{"topic": self.avail},
@@ -340,6 +368,35 @@ class Bridge:
                 "state_topic": f"{base}/bereich/{cat}", "command_topic": f"{base}/bereich/{cat}/set"},
                 f"switch.{uid}_bereich_{cat}", live=False)
 
+        # Steuerung (Freigaben je Gerät in der Add-on-Konfiguration): Aktionen und dauerhafte Einstellungen
+        controls = dev.steuerung.controls()
+        known = dev.settings.store.data.setdefault("ctl", {}).setdefault(uid, {})
+        now_ids = {c["id"]: c["component"] for c in controls}
+        for cid, comp in list(known.items()):
+            if now_ids.get(cid) != comp:
+                gone(comp, f"ctl_{cid}")
+                known.pop(cid)
+        for c in controls:
+            comp = c["component"]
+            conf = {"name": c["name"], "icon": c["icon"], "command_topic": f"{base}/ctl/{c['id']}/set"}
+            if comp != "button":
+                conf["state_topic"] = f"{base}/ctl/{c['id']}"
+            if comp == "switch":
+                conf.update({"assumed_state": True, "payload_on": "ON", "payload_off": "OFF",
+                             "state_on": "ON", "state_off": "OFF"})
+            elif comp == "button":
+                conf["payload_press"] = "PRESS"
+            elif comp == "select":
+                conf["options"] = [_(o) for o in c["extra"]["options"]]
+            conf.update({k: v for k, v in c["extra"].items() if k != "options"})
+            if c["config"]:
+                conf["entity_category"] = "config"
+            if not c["enabled"]:
+                conf["enabled_by_default"] = False    # 2 … 4 und Namen nur bei Bedarf in HA einschalten
+            ent(comp, f"ctl_{c['id']}", conf, f"{comp}.{uid}_{c['id']}")
+            known[c["id"]] = comp
+        dev.settings.store.save()
+
         gone("text", "steckdosenleisten")  # gab es kurz in 4.1.0
         # So viele Auswahlfelder wie gewählt + eins frei (höchstens MAX_STRIPS)
         shown = min(MAX_STRIPS, len(dev.leisten()) + 1)
@@ -370,6 +427,11 @@ class Bridge:
         else:
             gone("sensor", "gesamt_leistung")
             gone("sensor", "gesamt_energie")
+
+        ent("sensor", "uhr_abweichung", {
+            "name": _("Uhr – Abweichung"), "icon": "mdi:clock-alert-outline", "unit_of_measurement": "s",
+            "entity_category": "diagnostic", "suggested_display_precision": 0, "state_topic": st,
+            "value_template": tpl("uhr_abweichung")}, f"sensor.{uid}_uhr_abweichung")
 
         ent("binary_sensor", "ghl_connected", {
             "name": _("Verbindung"), "device_class": "connectivity", "entity_category": "diagnostic",

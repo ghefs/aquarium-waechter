@@ -6,7 +6,7 @@ import string
 import sys
 
 sys.path.insert(0, ".")
-from waechter import bridge, dashboard, extern, ghl, report, settings  # noqa: E402
+from waechter import bridge, dashboard, extern, ghl, report, settings, steuerung  # noqa: E402
 from waechter.translations import T  # noqa: E402
 
 used = []
@@ -18,7 +18,8 @@ for f in sorted(glob.glob("waechter/*.py")):
 options = (list(ghl.CATEGORY_NAMES.values()) + list(settings.LEVEL_MODES) + list(ghl.SENSOR_ARTS)
            + [e for v in ghl.SENSOR_ARTS.values() for _u, e, _n, _d in v if e] + list(ghl.ART_SHORT.values())
            + [ghl.NO_STRIP] + list(ghl.STRIP_TYPES) + list(report.OPTIONS) + [extern.OFF]
-           + list(bridge.Bridge.LABELS.values()) + list(dashboard.SHORT.values()) + [dashboard.HELP])
+           + list(bridge.Bridge.LABELS.values()) + list(dashboard.SHORT.values()) + [dashboard.HELP]
+           + list(steuerung.OPTIONEN))
 errors = []
 
 
@@ -35,7 +36,7 @@ for de in set(used + options):
             errors.append(f"Platzhalter {lang}: {de!r} -> {tr!r}")
 # Auswahlwerte müssen je Sprache eindeutig zurückübersetzbar sein
 selects = list(settings.LEVEL_MODES) + list(ghl.SENSOR_ARTS) + [ghl.NO_STRIP] + list(ghl.STRIP_TYPES) \
-    + list(report.OPTIONS) + [extern.OFF]
+    + list(report.OPTIONS) + [extern.OFF] + list(steuerung.OPTIONEN)
 for lang in ("en", "fr", "es", "it"):
     for de in selects:
         shown = T[de][lang]

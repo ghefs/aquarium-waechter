@@ -18,6 +18,7 @@ from .dashboard import Dashboard
 from .extern import HaPlugs
 from .forecast import Forecast
 from .ghl import GhlClient, Inventory, ReadError, strips_from_choice
+from .steuerung import Steuerung
 from .haws import HaWs
 from .mqtt import Mqtt, MqttError
 from . import i18n
@@ -62,6 +63,7 @@ class DeviceWorker(threading.Thread):
         self.dose_rate = {}  # key -> (ml/Tag, Zeitpunkt der Berechnung) aus dem Dosierprotokoll
         self._sig = None
         self.force_scan = False
+        self.steuerung = Steuerung(self)   # Aktionen/Einstellungen aus HA (nur mit Freigabe je Gerät)
 
     # vom Bridge aufgerufen
     def all_items(self):
@@ -164,12 +166,17 @@ class DeviceWorker(threading.Thread):
                 if not self.announced:
                     self.app.bridge.announce(self)
                     self.announced = True
+                    self.steuerung.refresh(force=True)
+                    self.app.bridge.publish_ctl(self)
+                elif self.steuerung.refresh():
+                    self.app.bridge.publish_ctl(self)
                 plugs = self.app.plugs.read(self.items)
                 values = self.inv.read(self.items, self.settings)
                 if self.ghl.down:
                     raise ReadError(self.ghl.down)
                 self.reachable(True)
                 values.update(plugs)
+                self.add_clock(values)
                 self.add_forecast(values)
                 self.add_power(values)
                 self.last_values = values
@@ -189,6 +196,13 @@ class DeviceWorker(threading.Thread):
                 log.exception("%s: unerwarteter Fehler", self.name)
             self.wake.wait(max(1, interval - (time.time() - start)))
             self.wake.clear()
+
+    def add_clock(self, values):
+        """Abweichung der Geräteuhr (s). Ist sie falsch, sind alle gespeicherten Zeitstempel verschoben."""
+        try:
+            values["uhr_abweichung"] = round(float(self.ghl.get("GET SYSTEM UNIXTIME")) - time.time())
+        except (ReadError, ValueError):
+            pass
 
     def has_power(self):
         """Gibt es etwas, dessen Leistung wir kennen (Steckdosen mit Strommessung, HA-Steckdosen)?"""
@@ -501,6 +515,22 @@ class App:
             self._end_maintenance(early=True)
         self._publish_maintenance()
 
+    def futterpause_minutes(self):
+        return max(1, min(120, int(self.opts.get("futterpause_min") or 15)))
+
+    def start_pause(self, minutes):
+        """Alarmpause (mindestens) für diese Dauer – von den ProfiLux-Funktionen Wartung/Futterpause benutzt."""
+        until = max(float(self.store.data.get("wartung_bis") or 0), time.time() + minutes * 60)
+        self.store.data["wartung_bis"] = until
+        self.store.save()
+        self._publish_maintenance()
+
+    def wasserwechsel_minutes(self):
+        return max(1, min(480, int(self.opts.get("wasserwechsel_min") or 60)))
+
+    def ctl_active(self):
+        return any(w.steuerung.active() for w in self.workers)
+
     def _set_maintenance_minutes(self, raw):
         try:
             m = max(5, min(480, int(float(raw))))
@@ -515,6 +545,12 @@ class App:
             return
         self.store.data["wartung_bis"] = 0
         self.store.save()
+        for w in self.workers:       # Anzeigen der Gerätefunktionen mit zurücksetzen
+            w.steuerung.clear_pauses()
+            try:
+                self.bridge.publish_ctl(w)
+            except MqttError:
+                pass
         self.notifier.send(_("Wartung beendet"), _("Überwachung wieder aktiv.") +
                            (" " + _("Noch anstehende Störungen werden jetzt gemeldet.") if not early else ""),
                            kind="ok")
@@ -576,6 +612,12 @@ class App:
             if time.time() - self._plugs_checked > PLUG_SEARCH_EVERY:
                 self._plugs_checked = time.time()
                 threading.Thread(target=self.refresh_plugs, daemon=True, name="steckdosen").start()
+            for w in self.workers:
+                if w.steuerung.expire():
+                    try:
+                        self.bridge.publish_ctl(w)
+                    except MqttError:
+                        pass
             if self.store.data.get("wartung_bis") and not self.maintenance():
                 self._end_maintenance()
                 self._publish_maintenance()

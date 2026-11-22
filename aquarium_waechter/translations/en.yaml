@@ -1,7 +1,7 @@
 configuration:
   geraete:
     name: "ProfiLux devices"
-    description: "Per ProfiLux: name and host (IP). Everything else is easier in HA on the dashboard settings page. Optional default: steckdosenleisten (sockets per power bar, e.g. \"STDL=4 (ohne Strom), PAB=6\" – easier: select the power bars in HA). Areas (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht) are easier to switch in HA on the settings page. unbenannte_abfragen: also read unnamed items."
+    description: "Per ProfiLux: name and host (IP). Everything else is easier in HA on the dashboard settings page. Optional default: steckdosenleisten (sockets per power bar, e.g. \"STDL=4 (ohne Strom), PAB=6\" – easier: select the power bars in HA). Areas (steckdosen, sensoren, niveau, durchfluss, dosierer, kh_director, ion_director, licht) are easier to switch in HA on the settings page. unbenannte_abfragen: also read unnamed items. steuerung: true enables actions (maintenance mode, feeding pause, water change, light scenes, thunderstorm, master brightness, KH/ION Director actions). einstellungen_schreiben: true additionally enables permanent changes (setpoints, light curves, names – with safety limits). Both are off by default and need System → GHL API → \"Full access\" in GHL Connect. typ: auto (default), profilux or mitras (luminaire LX7/LX8)."
   telegram_chat_id:
     name: "Telegram chat ID"
     description: "Where alarms go – group (starts with -) or private chat (positive number), several separated by commas. How to find the ID: see the wiki, \"Telegram\". Empty = no Telegram."
@@ -11,6 +11,12 @@ configuration:
   telegram_token:
     name: "Telegram bot token"
     description: "Leave empty if the Telegram integration is set up in HA – its token is used then."
+  futterpause_min:
+    name: "Feeding pause: pause alarms (minutes)"
+    description: "Only with \"steuerung\": how long alarms are paused when you start a feeding pause on the ProfiLux from Home Assistant. Match it to the duration set in GHL Connect. Default 15."
+  wasserwechsel_min:
+    name: "Water change: pause alarms (minutes)"
+    description: "Only with \"steuerung\": how long alarms are paused when you start a water change on the device from Home Assistant. Match it to the duration set in GHL Connect. Default 60."
   intervall:
     name: "Polling interval (seconds)"
   erinnerung:
